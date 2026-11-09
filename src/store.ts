@@ -14,7 +14,21 @@ export interface Profile {
   workouts: Workout[];
   active: Workout | null;
   settings: Settings;
+  /** Quando nome, visual ou configurações mudaram por último (para a sincronização decidir quem vence). */
+  metaAt?: number;
+  /** Treinos apagados: a sincronização avisa o outro celular para não trazê-los de volta. */
+  deleted?: string[];
 }
+
+/** Dados de perfil que vêm da nuvem. */
+export interface RemoteMeta {
+  name: string;
+  look: Look;
+  settings: Settings;
+  metaAt: number;
+}
+
+export type SyncStatus = { state: 'connecting' | 'ok' | 'error'; message?: string };
 
 const defaultSettings = (): Settings => ({ weeklyGoal: 3, unit: 'kg' });
 const newProfile = (name: string, look: Look, extra: Partial<Profile> = {}): Profile => ({
@@ -24,14 +38,22 @@ const newProfile = (name: string, look: Look, extra: Partial<Profile> = {}): Pro
   workouts: [],
   active: null,
   settings: defaultSettings(),
+  metaAt: 0,
+  deleted: [],
   ...extra,
 });
+
+const DEFAULT_NAMES = ['Vitor', 'Emanuela'];
 
 interface State {
   profiles: Profile[];
   currentId: string;
   /** Treino recém-concluído cujo resumo deve ser mostrado. */
   summaryId: string | null;
+  /** Código do grupo de sincronização (o mesmo nos dois celulares), ou null se desligada. */
+  syncCode: string | null;
+  syncStatus: SyncStatus | null;
+  setSyncStatus: (s: SyncStatus | null) => void;
 
   switchProfile: (id: string) => void;
   renameProfile: (id: string, name: string) => void;
@@ -48,9 +70,14 @@ interface State {
   deleteWorkout: (id: string) => void;
   updateSettings: (s: Partial<Settings>) => void;
   resetCurrent: () => void;
+
+  setSyncCode: (code: string | null) => void;
+  mergeRemoteMeta: (slot: number, meta: RemoteMeta) => void;
+  mergeRemoteWorkouts: (slot: number, live: Workout[], dead: string[]) => void;
 }
 
-const initialProfiles = [newProfile('Jogador 1', 'a'), newProfile('Jogador 2', 'b')];
+const initialProfiles = [newProfile(DEFAULT_NAMES[0], 'a'), newProfile(DEFAULT_NAMES[1], 'b')];
+const byStart = (a: Workout, b: Workout) => a.startedAt.localeCompare(b.startedAt);
 
 export const useStore = create<State>()(
   persist(
@@ -58,15 +85,25 @@ export const useStore = create<State>()(
       /** Aplica uma mudança só no perfil selecionado. */
       const update = (fn: (p: Profile) => Partial<Profile>) =>
         set({ profiles: get().profiles.map((p) => (p.id === get().currentId ? { ...p, ...fn(p) } : p)) });
+      const updateAt = (slot: number, fn: (p: Profile) => Partial<Profile> | null) => {
+        const profiles = get().profiles;
+        const patch = profiles[slot] && fn(profiles[slot]);
+        if (patch) set({ profiles: profiles.map((p, i) => (i === slot ? { ...p, ...patch } : p)) });
+      };
 
       return {
         profiles: initialProfiles,
         currentId: initialProfiles[0].id,
         summaryId: null,
+        syncCode: null,
+        syncStatus: null,
+        setSyncStatus: (syncStatus) => set({ syncStatus }),
 
         switchProfile: (id) => set({ currentId: id, summaryId: null }),
-        renameProfile: (id, name) => set({ profiles: get().profiles.map((p) => (p.id === id ? { ...p, name } : p)) }),
-        setLook: (id, look) => set({ profiles: get().profiles.map((p) => (p.id === id ? { ...p, look } : p)) }),
+        renameProfile: (id, name) =>
+          set({ profiles: get().profiles.map((p) => (p.id === id ? { ...p, name, metaAt: Date.now() } : p)) }),
+        setLook: (id, look) =>
+          set({ profiles: get().profiles.map((p) => (p.id === id ? { ...p, look, metaAt: Date.now() } : p)) }),
 
         startWorkout: () =>
           update(() => ({ active: { id: uid(), startedAt: new Date().toISOString(), finishedAt: null, deload: false, sets: [] } })),
@@ -84,17 +121,42 @@ export const useStore = create<State>()(
         discardWorkout: () => update(() => ({ active: null })),
         closeSummary: () => set({ summaryId: null }),
         openSummary: (id) => set({ summaryId: id }),
-        deleteWorkout: (id) => update((p) => ({ workouts: p.workouts.filter((w) => w.id !== id) })),
-        updateSettings: (s) => update((p) => ({ settings: { ...p.settings, ...s } })),
-        resetCurrent: () => update(() => ({ workouts: [], active: null })),
+        deleteWorkout: (id) =>
+          update((p) => ({ workouts: p.workouts.filter((w) => w.id !== id), deleted: [...(p.deleted ?? []), id] })),
+        updateSettings: (s) => update((p) => ({ settings: { ...p.settings, ...s }, metaAt: Date.now() })),
+        resetCurrent: () =>
+          update((p) => ({ workouts: [], active: null, deleted: [...(p.deleted ?? []), ...p.workouts.map((w) => w.id)] })),
+
+        setSyncCode: (code) => set({ syncCode: code }),
+        // A nuvem vence se for mais nova, ou se este celular nunca mexeu no perfil.
+        mergeRemoteMeta: (slot, meta) =>
+          updateAt(slot, (p) => {
+            const local = p.metaAt ?? 0;
+            if (!(meta.metaAt > local || (local === 0 && meta.metaAt >= 0))) return null;
+            if (p.name === meta.name && p.look === meta.look && JSON.stringify(p.settings) === JSON.stringify(meta.settings) && local === meta.metaAt)
+              return null;
+            return { name: meta.name, look: meta.look, settings: meta.settings, metaAt: meta.metaAt };
+          }),
+        // Junta os treinos: soma os que faltam aqui e tira os que foram apagados lá.
+        mergeRemoteWorkouts: (slot, live, dead) =>
+          updateAt(slot, (p) => {
+            const gone = new Set([...(p.deleted ?? []), ...dead]);
+            const have = new Set(p.workouts.map((w) => w.id));
+            const added = live.filter((w) => !have.has(w.id) && !gone.has(w.id));
+            const kept = p.workouts.filter((w) => !gone.has(w.id));
+            const newDead = dead.filter((id) => !(p.deleted ?? []).includes(id));
+            if (added.length === 0 && kept.length === p.workouts.length && newDead.length === 0) return null;
+            return { workouts: [...kept, ...added].sort(byStart), deleted: [...(p.deleted ?? []), ...newDead] };
+          }),
       };
     },
     {
       name: 'forja-v1',
-      version: 1,
-      partialize: ({ profiles, currentId }) => ({ profiles, currentId }),
-      // Versão 0 tinha um perfil só: ele vira o primeiro perfil, e o segundo nasce vazio.
+      version: 2,
+      partialize: ({ profiles, currentId, syncCode }) => ({ profiles, currentId, syncCode }),
       migrate: (persisted, version) => {
+        let s = persisted as { profiles: Profile[]; currentId: string; syncCode?: string | null };
+        // Versão 0 tinha um perfil só: ele vira o primeiro perfil, e o segundo nasce vazio.
         if (version === 0) {
           const old = persisted as { workouts?: Workout[]; active?: Workout | null; settings?: Settings };
           const first = newProfile('Jogador 1', 'a', {
@@ -102,9 +164,22 @@ export const useStore = create<State>()(
             active: old.active ?? null,
             settings: old.settings ?? defaultSettings(),
           });
-          return { profiles: [first, newProfile('Jogador 2', 'b')], currentId: first.id };
+          s = { profiles: [first, newProfile('Jogador 2', 'b')], currentId: first.id };
         }
-        return persisted as { profiles: Profile[]; currentId: string };
+        // Versão 2: nomes padrão viram Vitor e Emanuela (só se ninguém tiver trocado).
+        if (version < 2) {
+          s = {
+            ...s,
+            syncCode: s.syncCode ?? null,
+            profiles: s.profiles.map((p, i) => ({
+              ...p,
+              name: p.name === `Jogador ${i + 1}` ? DEFAULT_NAMES[i] ?? p.name : p.name,
+              metaAt: p.metaAt ?? 0,
+              deleted: p.deleted ?? [],
+            })),
+          };
+        }
+        return s;
       },
     },
   ),

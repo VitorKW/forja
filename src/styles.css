@@ -305,6 +305,16 @@ p { margin: 6px 0; }
 .seg button { padding: 7px 10px; border-radius: 9px; color: var(--muted); font-size: 0.85rem; font-weight: 700; }
 .seg button.on { background: var(--grad); color: #2b0b02; }
 
+.sync-code { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin: 10px 0 6px; border-radius: 16px; background: var(--well); border: 1px solid var(--line); }
+.sync-code .num { font-size: 1.25rem; letter-spacing: 0.06em; }
+.sync-status { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9rem; margin: 6px 0 12px; }
+.sync-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+.sync-status.ok .sync-dot { background: var(--rest); box-shadow: 0 0 10px var(--rest); }
+.sync-status.error { color: #ffa594; }
+.sync-status.error .sync-dot { background: var(--hot); }
+.sync-join { display: flex; gap: 8px; margin-top: 10px; }
+.sync-join .search { margin: 0; flex: 1; }
+.sync-join .ghost:disabled { opacity: 0.4; }
 .attr-block { padding: 2px 0 8px; }
 .gear { margin: -2px 0 0 86px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }

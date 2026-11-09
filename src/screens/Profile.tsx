@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Seal from '../components/Seal';
 import { XpBar } from '../components/ui';
 import { ACHIEVEMENTS } from '../game/achievements';
@@ -17,6 +18,71 @@ const GEAR: Record<Attribute, string> = {
   pernas: 'Grevas',
   folego: 'Capa',
 };
+
+/** Liga os dois celulares pelo mesmo código. */
+function SyncPanel() {
+  const code = useStore((s) => s.syncCode);
+  const status = useStore((s) => s.syncStatus);
+  const setSyncCode = useStore((s) => s.setSyncCode);
+  const [typed, setTyped] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const create = async () => {
+    const { newCode } = await import('../sync');
+    setSyncCode(newCode());
+  };
+  const join = () => {
+    const c = typed.trim().toUpperCase().replace(/\s+/g, '');
+    if (c.length >= 12) setSyncCode(c);
+  };
+  const copy = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* sem permissão de copiar: o código continua visível */
+    }
+  };
+
+  return (
+    <section className="panel">
+      <h2>Sincronizar celulares</h2>
+      {code ? (
+        <>
+          <p className="muted small">Os dois perfis aparecem atualizados nos celulares que usam este código.</p>
+          <div className="sync-code">
+            <span className="num">{code}</span>
+            <button className="link" onClick={copy}>
+              {copied ? 'Copiado' : 'Copiar'}
+            </button>
+          </div>
+          <p className={`sync-status ${status?.state ?? 'connecting'}`}>
+            <span className="sync-dot" />
+            {status?.state === 'ok' ? 'Sincronizado' : status?.state === 'error' ? status.message : 'Conectando...'}
+          </p>
+          <button className="ghost" onClick={() => confirm('Parar de sincronizar neste celular? Os dados daqui continuam salvos.') && setSyncCode(null)}>
+            Parar de sincronizar
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="muted small">Cada um usa o próprio celular e vê o progresso do outro. Crie um código num celular e digite o mesmo no outro.</p>
+          <button className="primary big" onClick={create}>
+            Criar código
+          </button>
+          <div className="sync-join">
+            <input className="search" placeholder="Já tenho um código" value={typed} onChange={(e) => setTyped(e.target.value)} autoCapitalize="characters" aria-label="Código de sincronização" />
+            <button className="ghost" onClick={join} disabled={typed.trim().length < 12}>
+              Entrar
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
 
 export default function Profile() {
   const p = useProgress();
@@ -151,6 +217,8 @@ export default function Profile() {
           ))}
         </ul>
       </section>
+
+      <SyncPanel />
 
       <section className="panel">
         <h2>Configurações</h2>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useProfile, useStore } from './store';
 import Home from './screens/Home';
@@ -41,7 +41,31 @@ function ProfileSwitch() {
   );
 }
 
+/** Liga a sincronização quando há um código; o Firebase só é baixado nesse caso. */
+function useSync() {
+  const code = useStore((s) => s.syncCode);
+  const setStatus = useStore((s) => s.setSyncStatus);
+  useEffect(() => {
+    if (!code) {
+      setStatus(null);
+      return;
+    }
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    import('./sync')
+      .then((m) => {
+        if (!cancelled) stop = m.startSync(code, setStatus);
+      })
+      .catch(() => setStatus({ state: 'error', message: 'Não foi possível carregar a sincronização.' }));
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [code, setStatus]);
+}
+
 export default function App() {
+  useSync();
   const [tab, setTab] = useState<Tab>('forja');
   const { active, id } = useProfile();
   const summaryId = useStore((s) => s.summaryId);
