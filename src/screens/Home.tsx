@@ -3,15 +3,16 @@ import { XpBar, fmt } from '../components/ui';
 import { dayKey, levelTitle, RULES } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Attribute } from '../game/types';
 import { heatColor } from '../heat';
-import { useStore } from '../store';
+import { useProfile, useStore } from '../store';
 import { useProgress } from '../useProgress';
+import BossSprite from '../components/BossSprite';
 
 const DAY_LETTERS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
 const DAY_NAMES = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
 
 export default function Home() {
   const p = useProgress();
-  const workouts = useStore((s) => s.workouts);
+  const { workouts, look } = useProfile();
   const startWorkout = useStore((s) => s.startWorkout);
   const levels = Object.fromEntries(ATTRIBUTES.map((a) => [a, p.attrLevels[a].level])) as Record<Attribute, number>;
   const tired = ATTRIBUTES.filter((a) => p.weekSets[a] > RULES.fatigueSetsPerWeek);
@@ -30,7 +31,7 @@ export default function Home() {
   return (
     <>
       <header className="forge">
-        <Character levels={levels} />
+        <Character levels={levels} playerLevel={p.level.level} look={look} />
         <div className="forge-level">
           <div className="row between baseline">
             <span className="level-num">Nível {p.level.level}</span>
@@ -70,6 +71,20 @@ export default function Home() {
         </p>
       </section>
 
+      <section className="panel boss-mini">
+        <BossSprite def={p.campaign.boss} px={4} className="breathe" />
+        <div className="grow">
+          <div className="muted small">Chefe da vez</div>
+          <strong>{p.campaign.boss.name}</strong>
+          <div className="hp">
+            <div className="hp-fill" style={{ width: `${((p.campaign.boss.hp - p.campaign.damage) / p.campaign.boss.hp) * 100}%` }} />
+          </div>
+          <div className="muted small">
+            {fmt(p.campaign.boss.hp - p.campaign.damage, 0)} de vida restante
+          </div>
+        </div>
+      </section>
+
       {(tired.length > 0 || close.length > 0) && (
         <section className="panel warn">
           {tired.map((a) => (
@@ -89,7 +104,9 @@ export default function Home() {
         Começar treino
       </button>
 
-      {p.workoutsDone === 0 && <p className="muted small center">Seu personagem ainda é aço frio. Cada série esquenta uma parte dele.</p>}
+      {p.workoutsDone === 0 && (
+        <p className="muted small center">Cada atributo que sobe de nível dá uma peça de equipamento: ombreiras, manoplas, peitoral, grevas e capa.</p>
+      )}
     </>
   );
 }

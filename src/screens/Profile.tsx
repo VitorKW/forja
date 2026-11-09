@@ -3,34 +3,105 @@ import { XpBar } from '../components/ui';
 import { ACHIEVEMENTS } from '../game/achievements';
 import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
 import { heatColor } from '../heat';
-import { useStore } from '../store';
+import { useProfile, useStore, type Look } from '../store';
 import { useProgress } from '../useProgress';
+import { TIER_NAME } from '../components/Character';
+import { fmt } from '../components/ui';
+import { EXERCISE_BY_ID } from '../game/exercises';
+import type { Attribute } from '../game/types';
+
+const GEAR: Record<Attribute, string> = {
+  empurrar: 'Ombreiras',
+  puxar: 'Manoplas',
+  core: 'Peitoral',
+  pernas: 'Grevas',
+  folego: 'Capa',
+};
 
 export default function Profile() {
   const p = useProgress();
-  const { workouts, settings, updateSettings, openSummary, deleteWorkout, resetAll } = useStore();
+  const { id, name, look, workouts, settings } = useProfile();
+  const { updateSettings, openSummary, deleteWorkout, resetCurrent, renameProfile, setLook } = useStore();
   const history = [...workouts].filter((w) => w.finishedAt).reverse();
   const unlocked = Object.keys(p.achievements).length;
+  const records = Object.entries(p.records)
+    .filter(([exId]) => EXERCISE_BY_ID[exId])
+    .sort((a, b) => b[1].best - a[1].best)
+    .slice(0, 8);
 
   return (
     <>
-      <h1>Perfil</h1>
+      <h1>{name}</h1>
 
       <section className="panel">
-        <h2>Atributos</h2>
+        <label className="setting">
+          Nome
+          <input className="name-input" value={name} maxLength={20} onChange={(e) => renameProfile(id, e.target.value)} aria-label="Nome do perfil" />
+        </label>
+        <div className="setting">
+          Visual
+          <div className="seg">
+            {(['a', 'b'] as Look[]).map((l) => (
+              <button key={l} className={look === l ? 'on' : ''} aria-pressed={look === l} onClick={() => setLook(id, l)}>
+                {l === 'a' ? 'Cabelo curto' : 'Cabelo longo'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Atributos e equipamento</h2>
         {ATTRIBUTES.map((a) => {
           const lvl = p.attrLevels[a].level;
+          const tierName = TIER_NAME(lvl);
           return (
-            <div key={a} className="attr-row">
-              <span>{ATTRIBUTE_LABEL[a]}</span>
-              <XpBar info={p.attrLevels[a]} small label={`Progresso de ${ATTRIBUTE_LABEL[a]}`} />
-              <span className="attr-level" style={{ color: lvl > 1 ? heatColor(lvl + 2) : undefined }}>
-                {lvl}
-              </span>
+            <div key={a} className="attr-block">
+              <div className="attr-row">
+                <span>{ATTRIBUTE_LABEL[a]}</span>
+                <XpBar info={p.attrLevels[a]} small label={`Progresso de ${ATTRIBUTE_LABEL[a]}`} />
+                <span className="attr-level" style={{ color: lvl > 1 ? heatColor(lvl + 2) : undefined }}>
+                  {lvl}
+                </span>
+              </div>
+              <div className="muted small gear">{tierName ? `${GEAR[a]} ${tierName}` : `${GEAR[a]}: libera no nível 2`}</div>
             </div>
           );
         })}
-        <p className="muted small">A cor de cada parte do personagem segue o nível do atributo, como metal esquentando na forja.</p>
+        <p className="muted small">Materiais: couro no nível 2, aço no 4, brasa no 6 e ouro no 8. Elmo no nível 5 do personagem, coroa no 10.</p>
+      </section>
+
+      <section className="panel">
+        <h2>Marcas</h2>
+        <div className="stats">
+          <div>
+            <strong>{p.workoutsDone}</strong>
+            <span className="muted small">treinos</span>
+          </div>
+          <div>
+            <strong>{fmt(p.distanceTotal)}</strong>
+            <span className="muted small">km andados</span>
+          </div>
+          <div>
+            <strong>{p.campaign.defeated}</strong>
+            <span className="muted small">chefes</span>
+          </div>
+        </div>
+        {records.length > 0 && (
+          <>
+            <h3>Recordes de força (1RM estimado)</h3>
+            <ul className="records">
+              {records.map(([exId, r]) => (
+                <li key={exId}>
+                  <span>{EXERCISE_BY_ID[exId].name}</span>
+                  <span className="xp-num">
+                    {fmt(r.best)} {settings.unit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
 
       <section className="panel">
@@ -102,9 +173,9 @@ export default function Profile() {
         </label>
         <button
           className="ghost danger"
-          onClick={() => confirm('Apagar todos os treinos e o progresso? Isso não pode ser desfeito.') && resetAll()}
+          onClick={() => confirm(`Apagar todos os treinos e o progresso de ${name}? Isso não pode ser desfeito.`) && resetCurrent()}
         >
-          Apagar todos os dados
+          Apagar os dados de {name}
         </button>
       </section>
     </>

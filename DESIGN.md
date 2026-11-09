@@ -49,6 +49,15 @@ A ideia central é que **a cor é informação**. Os ferreiros sabem a temperatu
 └──────────────────────────────┘
 ```
 
+## Pixel art (v0.3)
+
+O personagem e os chefes são pixel art, porque o público ama jogos e o estilo dá identidade. A interface em volta continua sóbria (aço e giz) para o sprite ser o destaque.
+
+- **Personagem** (20 × 25, em camadas): cada atributo libera uma peça (Empurrar → ombreiras, Puxar → manoplas, Core → peitoral, Pernas → grevas, Fôlego → capa). O material mostra o nível: couro (2), aço (4), brasa (6), ouro (8). O elmo aparece no nível 5 do personagem e a coroa no 10. São dois visuais por perfil (cabelo curto ou longo).
+- **Chefes** (16 × 16, desenhados à mão): 7 formas (gosma, morcego, golem, serpente, cavaleiro, hidra, chama) com paletas próprias. Eles crescem na tela conforme a campanha avança, e os próximos ficam em silhueta.
+
 ## Tentativas anteriores (para não repetir)
+
+- v0.2: silhueta vetorial que só mudava de cor. Ficou parecendo um boneco de teste. Chefes gerados por algoritmo saíram como bolhas sem personalidade, por isso agora são desenhados à mão.
 
 - v0.1: quase preto com tom marrom e um único destaque laranja, cards arredondados iguais, CAIXA ALTA, emoji nas abas. Ficou genérico.

@@ -9,21 +9,21 @@ export const ATTRIBUTE_LABEL: Record<Attribute, string> = {
   folego: 'Fôlego',
 };
 
-export const BOSS_IDS = ['agachamento', 'supino', 'terra'] as const;
-export type BossId = (typeof BOSS_IDS)[number];
-
 export interface Exercise {
   id: string;
   name: string;
   kind: 'forca' | 'cardio';
   primary: Attribute;
   secondary?: Attribute;
-  bossId?: BossId;
+  /** Cardio: XP por minuto (intensidade). */
+  perMinute?: number;
+  /** Cardio: XP extra por km. Ausente = atividade sem distância. */
+  perKm?: number;
 }
 
 /**
  * Uma série registrada.
- * Para exercícios de cardio, `reps` guarda os minutos e `weight` é ignorado.
+ * Para cardio, `reps` guarda os minutos, `distance` os km e `weight` é ignorado.
  */
 export interface SetEntry {
   id: string;
@@ -33,6 +33,7 @@ export interface SetEntry {
   /** Repetições na reserva. `null` = não registrado. */
   rir: number | null;
   warmup: boolean;
+  distance?: number;
 }
 
 export interface Workout {

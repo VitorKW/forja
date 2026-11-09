@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stepper, fmt } from '../components/ui';
 import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
-import { computeProgress, isSuspiciousWeight } from '../game/rules';
+import { cardioXp, computeProgress, isSuspiciousWeight } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise } from '../game/types';
-import { useStore } from '../store';
+import { useProfile, useStore } from '../store';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -30,12 +30,14 @@ function mmss(sec: number) {
 }
 
 export default function WorkoutScreen() {
-  const { active, workouts, settings, addSet, removeSet, setDeload, finishWorkout, discardWorkout } = useStore();
+  const { active, workouts, settings } = useProfile();
+  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout } = useStore();
   const now = useNow();
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [picking, setPicking] = useState(true);
   const [weight, setWeight] = useState(20);
   const [reps, setReps] = useState(10);
+  const [distance, setDistance] = useState(0);
   const [rir, setRir] = useState<number | null>(2);
   const [warmup, setWarmup] = useState(false);
   const [restUntil, setRestUntil] = useState<number | null>(null);
@@ -76,7 +78,8 @@ export default function WorkoutScreen() {
     const all = [...workouts.flatMap((w) => w.sets), ...active.sets];
     const last = [...all].reverse().find((s) => s.exerciseId === ex.id);
     if (ex.kind === 'cardio') {
-      setReps(last?.reps ?? 20);
+      setReps(last?.reps ?? 30);
+      setDistance(last?.distance ?? 0);
     } else {
       setWeight(last?.weight ?? 20);
       setReps(last?.reps ?? 10);
@@ -88,7 +91,11 @@ export default function WorkoutScreen() {
     if (!cardio && isSuspiciousWeight(workouts, exercise.id, weight)) {
       if (!confirm(`${fmt(weight)} ${settings.unit} é bem acima do seu máximo em ${exercise.name}. Confirmar?`)) return;
     }
-    addSet({ exerciseId: exercise.id, weight: cardio ? 0 : weight, reps, rir: cardio ? null : warmup ? null : rir, warmup: cardio ? false : warmup });
+    if (cardio) {
+      addSet({ exerciseId: exercise.id, weight: 0, reps, rir: null, warmup: false, ...(exercise.perKm && distance > 0 ? { distance } : {}) });
+      return;
+    }
+    addSet({ exerciseId: exercise.id, weight, reps, rir: warmup ? null : rir, warmup });
     if (!cardio) setRestUntil(Date.now() + REST_SECONDS * 1000);
   };
 
@@ -142,11 +149,22 @@ export default function WorkoutScreen() {
               <div className="muted small">
                 {ATTRIBUTE_LABEL[exercise.primary]}
                 {exercise.secondary && ` + ${ATTRIBUTE_LABEL[exercise.secondary]}`}
-                {exercise.bossId && <span className="tag">chefe</span>}
               </div>
 
               {cardio ? (
-                <Stepper label="Minutos" value={reps} onChange={setReps} step={5} min={1} />
+                <>
+                  <div className="steppers">
+                    <Stepper label="Duração" value={reps} onChange={setReps} step={5} min={1} suffix="min" />
+                    {exercise.perKm ? (
+                      <Stepper label="Distância (opcional)" value={distance} onChange={setDistance} step={0.5} suffix="km" />
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                  <p className="muted small">
+                    Rende cerca de {Math.round(cardioXp(exercise.id, reps, exercise.perKm ? distance : 0))} XP, antes de bônus.
+                  </p>
+                </>
               ) : (
                 <>
                   <div className="steppers">
@@ -177,7 +195,7 @@ export default function WorkoutScreen() {
               )}
 
               <button className="primary big" onClick={register}>
-                Registrar série
+                {cardio ? 'Registrar atividade' : 'Registrar série'}
               </button>
             </section>
           )
@@ -200,7 +218,9 @@ export default function WorkoutScreen() {
                 <li key={s.id}>
                   <span className="muted">{i + 1}.</span>
                   {g.ex.kind === 'cardio' ? (
-                    <span>{s.reps} min</span>
+                    <span>
+                      {s.reps} min{s.distance ? `, ${fmt(s.distance)} km` : ''}
+                    </span>
                   ) : (
                     <span>
                       {fmt(s.weight)} {settings.unit} × {s.reps}
@@ -252,21 +272,21 @@ function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; o
         )}
       </div>
       <input className="search" placeholder="Buscar..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-      {ATTRIBUTES.map((a) => {
-        const items = list.filter((e) => e.primary === a);
-        if (!items.length) return null;
-        return (
-          <div key={a} className="pick-group">
-            <div className="muted small">{ATTRIBUTE_LABEL[a]}</div>
-            {items.map((e) => (
+      {[
+        { key: 'cardio', label: 'Caminhada, cardio e esportes', items: list.filter((e) => e.kind === 'cardio') },
+        ...ATTRIBUTES.map((a) => ({ key: a, label: ATTRIBUTE_LABEL[a], items: list.filter((e) => e.kind === 'forca' && e.primary === a) })),
+      ].map((g) =>
+        g.items.length === 0 ? null : (
+          <div key={g.key} className="pick-group">
+            <div className="muted small">{g.label}</div>
+            {g.items.map((e) => (
               <button key={e.id} className="pick" onClick={() => onPick(e)}>
                 {e.name}
-                {e.bossId && <span className="tag">chefe</span>}
               </button>
             ))}
           </div>
-        );
-      })}
+        ),
+      )}
     </section>
   );
 }

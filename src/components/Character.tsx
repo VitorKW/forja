@@ -1,73 +1,180 @@
 import type { Attribute } from '../game/types';
 import { heatColor } from '../heat';
+import type { Look } from '../store';
 
 /**
- * O personagem como metal sobre a bigorna: cada parte do corpo tem a cor
- * de calor do nível do atributo correspondente.
+ * Personagem em pixel art (20 × 25), desenhado em camadas.
+ * Cada sprite é escrito só pela metade esquerda (10 colunas) e espelhado.
+ * Cada atributo destrava uma peça de equipamento; o material melhora com o nível:
+ * couro (2–3) → aço (4–5) → brasa (6–7) → ouro (8+).
  */
-export default function Character({ levels, size = 220 }: { levels: Record<Attribute, number>; size?: number }) {
-  const part = (a: Attribute) => ({
-    fill: heatColor(levels[a]),
-    filter: levels[a] >= 2 ? 'url(#incandescente)' : undefined,
-  });
+
+type Half = string[]; // 25 linhas × 10 colunas; '.' = transparente
+
+const BASE: Half = [
+  '..........',
+  '..........',
+  '........kk',
+  '......kkhh',
+  '.....khhhh',
+  '....khhhhh',
+  '....khssss',
+  '....khskss',
+  '....khssss',
+  '.....kssss',
+  '......kkss',
+  '....kkcccc',
+  '...kcccccc',
+  '..kskccccc',
+  '..kskccccc',
+  '..kskccccc',
+  '..ksskwwww',
+  '...kkkpppp',
+  '.....kpppp',
+  '.....kpppk',
+  '.....kpppk',
+  '.....kpppk',
+  '.....kbbbk',
+  '....kbbbbk',
+  '....kkkkkk',
+];
+
+const LONG_HAIR: Half = [
+  '', '', '', '', '', '',
+  '..kh......',
+  '..kh......',
+  '..kh......',
+  '..kh......',
+  '..khh.....',
+  '..khh.....',
+  '..kh......',
+];
+
+// A capa fica atrás do corpo: só aparece nas laterais, por fora dos braços.
+const CAPE: Half = [
+  '', '', '', '', '', '', '', '', '', '', '',
+  '...kCCC...',
+  '..kCCCC...',
+  '.kCC......',
+  '.kCC......',
+  '.kCc......',
+  '.kCC......',
+  'kCCC......',
+  'kCCC......',
+  'kCcC......',
+  'kCCCk.....',
+  'kCCCk.....',
+  '.kkk......',
+];
+
+const SHOULDERS: Half = ['', '', '', '', '', '', '', '', '', '', '...kkk....', '..kSSSk...', '..kSsSS...'];
+const GAUNTLETS: Half = ['', '', '', '', '', '', '', '', '', '', '', '', '', '..GGG.....', '..GgG.....', '..GGG.....', '..GGGk....'];
+const CHEST: Half = ['', '', '', '', '', '', '', '', '', '', '', '', '.....AAAAA', '.....AaAAA', '.....AAAAA', '.....AAAAA'];
+const GREAVES: Half = [
+  '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+  '......LLL.',
+  '......LlL.',
+  '......LLL.',
+  '......LLL.',
+  '.....LLLL.',
+];
+// Elmo com aba escura, protetores de bochecha e de nariz: não pode parecer cabelo.
+const HELM: Half = [
+  '',
+  '........kk',
+  '......kkHH',
+  '.....kHHhH',
+  '....kHHhHH',
+  '....kHHHHH',
+  '....kkkkkk',
+  '....kH...k',
+  '....kH...H',
+  '....kH...H',
+];
+const CROWN: Half = ['.......Y.Y', '.......YYY', '........kk'];
+
+/** Material do equipamento conforme o nível do atributo. */
+function tier(level: number): [string, string] | null {
+  if (level >= 8) return ['#f7c548', '#fff1c9']; // ouro
+  if (level >= 6) return ['#ef6a1f', '#fbd77a']; // brasa
+  if (level >= 4) return ['#a7afb9', '#e6eaee']; // aço
+  if (level >= 2) return ['#8a5a3b', '#b98458']; // couro
+  return null;
+}
+
+export const TIER_NAME = (level: number) =>
+  level >= 8 ? 'de ouro' : level >= 6 ? 'em brasa' : level >= 4 ? 'de aço' : level >= 2 ? 'de couro' : null;
+
+export default function Character({
+  levels,
+  playerLevel,
+  look,
+  scale = 9,
+}: {
+  levels: Record<Attribute, number>;
+  playerLevel: number;
+  look: Look;
+  scale?: number;
+}) {
+  const colors: Record<string, string> = {
+    k: '#17120f',
+    s: '#e8b48a',
+    h: look === 'b' ? '#8a3f1c' : '#3f2616',
+    c: look === 'b' ? '#6d4d7a' : '#4d5868',
+    p: '#2c323c',
+    b: '#4a3426',
+    w: '#7a5230',
+  };
+
+  const layers: { half: Half; on: boolean; mat?: [string, string] | null; keys?: [string, string] }[] = [
+    { half: CAPE, on: levels.folego >= 2, mat: tier(levels.folego), keys: ['C', 'c'] },
+    { half: BASE, on: true },
+    { half: LONG_HAIR, on: look === 'b' },
+    { half: CHEST, on: levels.core >= 2, mat: tier(levels.core), keys: ['A', 'a'] },
+    { half: SHOULDERS, on: levels.empurrar >= 2, mat: tier(levels.empurrar), keys: ['S', 's'] },
+    { half: GAUNTLETS, on: levels.puxar >= 2, mat: tier(levels.puxar), keys: ['G', 'g'] },
+    { half: GREAVES, on: levels.pernas >= 2, mat: tier(levels.pernas), keys: ['L', 'l'] },
+    { half: HELM, on: playerLevel >= 5, mat: tier(Math.min(9, playerLevel)), keys: ['H', 'h'] },
+    { half: CROWN, on: playerLevel >= 10, mat: ['#f7c548', '#fff1c9'], keys: ['Y', 'y'] },
+  ];
+
+  // Junta as camadas numa grade 20 × 25 de cores.
+  const grid: (string | null)[][] = Array.from({ length: 25 }, () => Array(20).fill(null));
+  for (const layer of layers) {
+    if (!layer.on) continue;
+    layer.half.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '.') continue;
+        let color: string | undefined;
+        if (layer.keys && layer.mat && ch === layer.keys[0]) color = layer.mat[0];
+        else if (layer.keys && layer.mat && ch === layer.keys[1]) color = layer.mat[1];
+        else color = colors[ch];
+        if (!color) continue;
+        grid[y][x] = color;
+        grid[y][19 - x] = color;
+      }
+    });
+  }
+
+  const aura = levels.folego >= 6 || playerLevel >= 8;
+  const glow = heatColor(Math.min(10, Math.max(levels.folego, playerLevel)));
 
   return (
-    <svg viewBox="0 0 220 300" width={size} height={(size * 300) / 220} className="character" role="img" aria-label="Seu personagem: cada parte brilha conforme o nível do atributo">
-      <defs>
-        <filter id="incandescente" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-          <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.75 0" result="glow" />
-          <feMerge>
-            <feMergeNode in="glow" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        <linearGradient id="aco" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#4a4f56" />
-          <stop offset="1" stopColor="#2a2d32" />
-        </linearGradient>
-        <linearGradient id="reflexo" x1="0" y1="0" x2="0.35" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity="0.32" />
-          <stop offset="0.45" stopColor="#fff" stopOpacity="0.06" />
-          <stop offset="1" stopColor="#000" stopOpacity="0.22" />
-        </linearGradient>
-        <radialGradient id="calor-chao" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#ef6a1f" stopOpacity="0.28" />
-          <stop offset="1" stopColor="#ef6a1f" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* brilho sobre a bigorna */}
-      <ellipse cx="110" cy="236" rx="96" ry="22" fill="url(#calor-chao)" />
-
-      {/* cabeça */}
-      <circle cx="110" cy="30" r="19" fill="#4a4f56" />
-      {/* ombros e peito: Empurrar */}
-      <path d="M66 60 Q110 46 154 60 L148 104 Q110 112 72 104 Z" {...part('empurrar')} />
-      {/* braços: Puxar */}
-      <path d="M63 63 L46 136 L58 140 L76 94 Z" {...part('puxar')} />
-      <path d="M157 63 L174 136 L162 140 L144 94 Z" {...part('puxar')} />
-      {/* abdômen: Core */}
-      <path d="M74 108 Q110 116 146 108 L140 146 Q110 152 80 146 Z" {...part('core')} />
-      {/* pernas: Pernas */}
-      <path d="M80 150 L106 154 L102 226 L82 226 Z" {...part('pernas')} />
-      <path d="M140 150 L114 154 L118 226 L138 226 Z" {...part('pernas')} />
-      {/* reflexo do metal: luz de cima, sem mudar a cor do nível */}
-      <g fill="url(#reflexo)" pointerEvents="none">
-        <path d="M66 60 Q110 46 154 60 L148 104 Q110 112 72 104 Z" />
-        <path d="M63 63 L46 136 L58 140 L76 94 Z" />
-        <path d="M157 63 L174 136 L162 140 L144 94 Z" />
-        <path d="M74 108 Q110 116 146 108 L140 146 Q110 152 80 146 Z" />
-        <path d="M80 150 L106 154 L102 226 L82 226 Z" />
-        <path d="M140 150 L114 154 L118 226 L138 226 Z" />
+    <svg
+      viewBox="-2 -1 24 27"
+      width={24 * scale}
+      height={27 * scale}
+      shapeRendering="crispEdges"
+      className="character"
+      role="img"
+      aria-label="Seu personagem: cada peça de equipamento vem de um atributo"
+      style={aura ? { filter: `drop-shadow(0 0 6px ${glow})` } : undefined}
+    >
+      <ellipse cx="10" cy="24.6" rx="7" ry="1.2" fill="#00000066" />
+      <g className="idle">
+        {grid.flatMap((row, y) => row.map((c, x) => (c ? <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} fill={c} /> : null)))}
       </g>
-      {/* coração: Fôlego */}
-      <circle cx="122" cy="80" r="7" fill={heatColor(levels.folego + 2)} filter={levels.folego >= 2 ? 'url(#incandescente)' : undefined} />
-
-      {/* bigorna */}
-      <path d="M34 228 H186 Q186 240 170 242 L150 244 L146 262 H74 L70 244 L50 242 Q34 240 34 228 Z" fill="url(#aco)" />
-      <path d="M34 228 H186" stroke="#6b717a" strokeWidth="1.5" />
-      <rect x="62" y="262" width="96" height="14" rx="2" fill="#2a2d32" />
     </svg>
   );
 }

@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { computeProgress } from './game/rules';
-import { useStore } from './store';
+import { useProfile } from './store';
 
-/** Progresso recalculado a partir do histórico. Só refaz a conta quando os treinos ou as configurações mudam. */
+/** Progresso do perfil atual, recalculado a partir do histórico. Só refaz a conta quando os dados mudam. */
 export function useProgress() {
-  const workouts = useStore((s) => s.workouts);
-  const settings = useStore((s) => s.settings);
+  const { workouts, settings } = useProfile();
   return useMemo(() => computeProgress(workouts, settings), [workouts, settings]);
 }

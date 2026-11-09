@@ -201,3 +201,61 @@ p { margin: 6px 0; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .sparks { display: none; }
 }
+
+/* ---------- Perfis ---------- */
+.profile-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 10px 16px 0; }
+.profile-tabs button {
+  font-family: var(--display); font-weight: 700; font-size: 1.15rem; padding: 9px 8px; border-radius: var(--r);
+  color: var(--limalha); background: #15171a; box-shadow: inset 0 1px 2px #000a; position: relative;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.profile-tabs button.on { color: var(--giz); background: linear-gradient(180deg, #34383e, var(--aco)); box-shadow: inset 0 1px 0 #ffffff1c, inset 0 -2px 0 var(--laranja); }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--laranja); margin-left: 6px; vertical-align: 2px; box-shadow: 0 0 8px var(--laranja); }
+.name-input { width: 55%; text-align: right; background: #15171a; border: 0; border-radius: var(--r); padding: 8px 10px; box-shadow: inset 0 1px 2px #000a; }
+.seg { display: flex; gap: 4px; }
+.seg button { padding: 7px 10px; border-radius: var(--r); background: #15171a; color: var(--limalha); font-size: 0.87rem; box-shadow: inset 0 1px 2px #000a; }
+.seg button.on { background: var(--laranja); color: #2a0d03; font-weight: 600; box-shadow: none; }
+
+/* ---------- Personagem em pixel art ---------- */
+.character { image-rendering: pixelated; max-width: 72vw; height: auto; }
+.character .idle { animation: idle 1.6s steps(1) infinite; }
+@keyframes idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(0.35px); } }
+.attr-block { padding: 2px 0 6px; }
+.gear { margin: -2px 0 0 86px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.stats div { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: var(--r); background: #15171a; box-shadow: inset 0 1px 2px #000a; }
+.stats strong { font-family: var(--display); font-size: 1.8rem; line-height: 1.1; }
+.records { list-style: none; margin: 0; padding: 0; }
+.records li { display: flex; justify-content: space-between; padding: 6px 0; box-shadow: inset 0 1px 0 #ffffff0a; }
+
+/* ---------- Chefes ---------- */
+.boss-sprite { display: block; image-rendering: pixelated; }
+.boss-sprite.defeated { filter: grayscale(1) brightness(0.55); }
+.breathe { animation: breathe 2.4s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.03, 0.97); } }
+.boss-stage { text-align: center; padding-top: 14px; background: radial-gradient(ellipse at 50% 45%, #3a1d14 0%, var(--aco) 62%); }
+.boss-count { text-align: left; }
+.boss-portrait { display: flex; justify-content: center; align-items: flex-end; min-height: 190px; padding: 6px 0 10px; }
+.boss-portrait .boss-sprite { filter: drop-shadow(0 6px 0 #00000066); }
+.boss-name { font-size: 1.9rem; margin: 4px 0 0; }
+.boss-epithet { margin: 0 0 12px; }
+.hp { position: relative; height: 12px; background: #15171a; border-radius: 2px; overflow: hidden; margin: 6px 0; box-shadow: inset 0 1px 2px #000a; }
+.hp.big { height: 24px; }
+.hp-fill { height: 100%; background: linear-gradient(180deg, #ff6b5c, var(--sangue) 45%, #8e1b10); transition: width 0.6s ease; }
+.hp span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 0.95rem; text-shadow: 0 1px 2px #000; }
+.trail { list-style: none; margin: 0; padding: 4px 0 0; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+.trail li { flex: 0 0 72px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; text-align: center; line-height: 1.15; }
+.trail li .boss-sprite { min-height: 34px; }
+.trail li.now { color: var(--amarelo); }
+.trail li.now .boss-sprite { filter: drop-shadow(0 0 6px #ef6a1f99); }
+.trail li.won span, .trail li.next span { color: var(--limalha); }
+.boss-mini { display: flex; gap: 14px; align-items: center; }
+.boss-mini .hp { margin: 4px 0 2px; }
+
+/* Golpe no resumo do treino */
+.boss-hit .row { align-items: center; }
+.boss-hit .hit { animation: shake 0.45s ease-out; }
+.boss-hit.killed { box-shadow: inset 0 1px 0 #ffffff14, inset 0 0 0 1px var(--amarelo); }
+.boss-down { margin: 10px 0 0; }
+.record-win { box-shadow: inset 3px 0 0 var(--amarelo), inset 0 1px 0 #ffffff14; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }

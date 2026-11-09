@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { bossAt, bossSprite, campaignAt } from './campaign';
 import {
+  cardioXp,
   computeProgress,
   estimate1RM,
   isSuspiciousWeight,
@@ -88,9 +90,19 @@ describe('XP de um treino', () => {
     expect(r.attrXp.core).toBe(3);
   });
 
-  it('cardio rende 1 XP por minuto em Fôlego', () => {
-    const w = workout('2026-11-09T10:00:00', [set('corrida', 0, 25, null)]);
-    expect(computeProgress([w], settings, NOW).attrXp.folego).toBe(25);
+  it('caminhada de 1 h e 4 km rende 72 XP divididos entre Fôlego e Pernas', () => {
+    expect(cardioXp('caminhada', 60, 4)).toBe(72);
+    const w = workout('2026-11-09T10:00:00', [{ ...set('caminhada', 0, 60, null), distance: 4 }]);
+    const p = computeProgress([w], settings, NOW);
+    expect(p.attrXp.folego).toBe(50);
+    expect(p.attrXp.pernas).toBe(22);
+    expect(p.distanceTotal).toBe(4);
+    expect(p.totalXp).toBe(72 + 30);
+  });
+
+  it('corrida rende mais por minuto que caminhada, e atividade sem distância ignora km', () => {
+    expect(cardioXp('corrida', 30)).toBeGreaterThan(cardioXp('caminhada', 30));
+    expect(cardioXp('yoga', 60, 10)).toBe(cardioXp('yoga', 60));
   });
 
   it('séries depois da 40ª não rendem XP', () => {
@@ -151,22 +163,63 @@ describe('meta semanal e constância', () => {
   });
 });
 
-describe('chefes', () => {
-  it('a primeira marca revela o chefe e superar 1RM × 1,025 o derrota', () => {
-    const w1 = workout('2026-11-02T10:00:00', [set('supino', 80, 5)]); // 1RM ≈ 93,3 → HP ≈ 95,7
+describe('recordes pessoais', () => {
+  it('a primeira marca vira referência e superar 1RM × 1,025 quebra o recorde', () => {
+    const w1 = workout('2026-11-02T10:00:00', [set('supino', 80, 5)]); // 1RM ≈ 93,3 → alvo ≈ 95,7
     const w2 = workout('2026-11-03T10:00:00', [set('supino', 82, 5)]); // ≈ 95,7 → não basta
-    const w3 = workout('2026-11-04T10:00:00', [set('supino', 85, 5)]); // ≈ 99,2 → vitória
+    const w3 = workout('2026-11-04T10:00:00', [set('supino', 85, 5), set('supino', 86, 5)]); // vitória, bônus uma vez só
     const p = computeProgress([w1, w2, w3], settings, NOW);
-    expect(p.results[w2.id].bossDefeats).toEqual([]);
-    expect(p.results[w3.id].bossDefeats).toEqual(['supino']);
-    expect(p.bosses.supino.defeats).toBe(1);
-    expect(p.bosses.supino.base).toBeCloseTo(85 * (1 + 5 / 30));
-    expect(p.achievements.matador).toBe(w3.finishedAt);
+    expect(p.results[w2.id].records).toEqual([]);
+    expect(p.results[w3.id].records).toEqual(['supino']);
+    expect(p.results[w3.id].bonuses.filter((b) => b.xp === 100)).toHaveLength(1);
+    expect(p.records.supino.base).toBeCloseTo(85 * (1 + 5 / 30)); // 86 não supera 85 + 2,5%
+    expect(p.records.supino.best).toBeCloseTo(86 * (1 + 5 / 30));
+    expect(p.achievements.recordista).toBe(w3.finishedAt);
   });
 
-  it('aquecimento não enfrenta chefe', () => {
-    const w = workout('2026-11-02T10:00:00', [set('terra', 100, 5, null, true)]);
-    expect(computeProgress([w], settings, NOW).bosses.terra.base).toBeNull();
+  it('vale para qualquer exercício de força, mas não para aquecimento', () => {
+    const w = workout('2026-11-02T10:00:00', [set('rosca', 14, 10), set('terra', 100, 5, null, true)]);
+    const p = computeProgress([w], settings, NOW);
+    expect(p.records.rosca).toBeDefined();
+    expect(p.records.terra).toBeUndefined();
+  });
+});
+
+describe('campanha de chefes', () => {
+  it('todo XP é dano e o excedente passa para o próximo chefe', () => {
+    expect(campaignAt(0)).toMatchObject({ defeated: 0, damage: 0 });
+    expect(campaignAt(249).defeated).toBe(0);
+    const c = campaignAt(260);
+    expect(c.defeated).toBe(1);
+    expect(c.damage).toBe(10);
+    expect(c.boss.name).toBe(bossAt(1).name);
+  });
+
+  it('é infinita: depois dos 12 chefes vêm ecos mais fortes', () => {
+    expect(bossAt(12).name).toMatch(/^Eco de/);
+    expect(bossAt(12).hp).toBeGreaterThan(bossAt(11).hp);
+  });
+
+  it('chefes crescem e todo sprite é 16 × 16, simétrico e com olhos', () => {
+    expect(bossAt(10).size).toBeGreaterThan(bossAt(0).size);
+    for (let i = 0; i < 12; i++) {
+      const g = bossSprite(bossAt(i));
+      expect(g).toHaveLength(16);
+      for (const row of g) {
+        expect(row).toHaveLength(16);
+        expect(row.join('')).toBe([...row].reverse().join(''));
+      }
+      expect(g.flat().filter((c) => c === 'e').length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('o resultado do treino mostra o antes e o depois na campanha', () => {
+    const sets = Array.from({ length: 20 }, () => set('rosca', 10, 10, 2));
+    const w = workout('2026-11-09T10:00:00', sets); // 20 × 13 + 30 = 290
+    const r = computeProgress([w], settings, NOW).results[w.id];
+    expect(r.campaignBefore.defeated).toBe(0);
+    expect(r.campaignAfter.defeated).toBe(1);
+    expect(r.achievements).toContain('matador');
   });
 });
 

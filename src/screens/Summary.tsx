@@ -6,7 +6,9 @@ import { EXERCISE_BY_ID } from '../game/exercises';
 import { levelTitle } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
 import { HEAT } from '../heat';
-import { useStore } from '../store';
+import { useProfile, useStore } from '../store';
+import BossSprite from '../components/BossSprite';
+import type { CampaignState } from '../game/campaign';
 import { useProgress } from '../useProgress';
 
 function useCountUp(target: number, ms = 1100) {
@@ -56,10 +58,43 @@ function Sparks({ count = 28 }: { count?: number }) {
   );
 }
 
+/** O golpe no chefe: a vida cai do antes para o depois; se ele cair, o próximo aparece. */
+function BossHit({ before, after, damage }: { before: CampaignState; after: CampaignState; damage: number }) {
+  const killed = after.defeated - before.defeated;
+  const [hit, setHit] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setHit(true), 500);
+    return () => clearTimeout(t);
+  }, []);
+  const startPct = ((before.boss.hp - before.damage) / before.boss.hp) * 100;
+  const endPct = killed > 0 ? 0 : ((after.boss.hp - after.damage) / after.boss.hp) * 100;
+
+  return (
+    <section className={`panel boss-hit${killed > 0 ? ' killed' : ''}`}>
+      <div className="row gap">
+        <BossSprite def={before.boss} px={5} defeated={hit && killed > 0} className={hit ? 'hit' : ''} />
+        <div className="grow">
+          <div className="small muted">{hit ? `−${damage} de vida` : 'Atacando...'}</div>
+          <strong>{before.boss.name}</strong>
+          <div className="hp">
+            <div className="hp-fill" style={{ width: `${hit ? endPct : startPct}%`, transition: 'width 0.9s ease-out' }} />
+          </div>
+        </div>
+      </div>
+      {hit && killed > 0 && (
+        <p className="boss-down">
+          {killed > 1 ? `Você derrubou ${killed} chefes de uma vez!` : `Você derrotou ${before.boss.name}!`} O próximo é{' '}
+          <strong>{after.boss.name}</strong>, {after.boss.epithet}.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default function Summary({ workoutId }: { workoutId: string }) {
   const p = useProgress();
   const close = useStore((s) => s.closeSummary);
-  const workout = useStore((s) => s.workouts.find((w) => w.id === workoutId));
+  const workout = useProfile().workouts.find((w) => w.id === workoutId);
   const r = p.results[workoutId];
   const shown = useCountUp(r?.xpTotal ?? 0);
 
@@ -91,7 +126,8 @@ export default function Summary({ workoutId }: { workoutId: string }) {
             <span className="strike-unit">XP</span>
           </div>
           <p className="muted small">
-            {workout.sets.length} séries em {date}
+            {workout.sets.length} {workout.sets.length === 1 ? 'registro' : 'registros'} em {date}
+            {r.distance > 0 && `, ${fmt(r.distance)} km`}
             {r.multiplier > 1 && `, com bônus de constância ×${fmt(r.multiplier)}`}
           </p>
         </div>
@@ -99,13 +135,19 @@ export default function Summary({ workoutId }: { workoutId: string }) {
         {leveled && (
           <section className="panel levelup">
             <div className="levelup-num">Nível {r.levelAfter}</div>
-            <div className="muted">Você agora é {levelTitle(r.levelAfter).toLowerCase()}.</div>
+            <div className="muted">
+              {levelTitle(r.levelAfter) !== levelTitle(r.levelBefore)
+                ? `Você agora é ${levelTitle(r.levelAfter).toLowerCase()}.`
+                : 'Seu personagem ficou mais forte.'}
+            </div>
           </section>
         )}
 
-        {r.bossDefeats.map((b) => (
-          <section key={b} className="panel boss-win">
-            Você venceu o chefe do <strong>{EXERCISE_BY_ID[b].name.toLowerCase()}</strong>. Ele volta mais forte na próxima.
+        <BossHit before={r.campaignBefore} after={r.campaignAfter} damage={r.xpTotal} />
+
+        {r.records.map((id) => (
+          <section key={id} className="panel record-win">
+            Recorde pessoal em <strong>{EXERCISE_BY_ID[id]?.name.toLowerCase()}</strong>.
           </section>
         ))}
 

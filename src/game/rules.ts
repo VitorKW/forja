@@ -5,15 +5,15 @@
  */
 import { EXERCISE_BY_ID } from './exercises';
 import { ACHIEVEMENTS, type AchievementId } from './achievements';
-import { ATTRIBUTES, BOSS_IDS, type Attribute, type BossId, type Settings, type Workout } from './types';
+import { campaignAt, type CampaignState } from './campaign';
+import { ATTRIBUTES, type Attribute, type Settings, type Workout } from './types';
 
 export const XP = {
   effectiveSet: 10,
   weakSet: 2, // aquecimento ou série com RIR > 3
   rirBonus: 3,
-  cardioPerMinute: 1,
   workoutBonus: 30,
-  bossBonus: 100,
+  recordBonus: 100,
   weeklyGoalBonus: 75,
 } as const;
 
@@ -22,9 +22,10 @@ export const RULES = {
   fatigueSetsPerWeek: 20,
   fatigueFactor: 0.5,
   maxSetsWithXp: 40,
+  maxCardioMinutes: 300,
   streakStep: 0.1,
   maxStreakSteps: 5,
-  bossMargin: 1.025,
+  recordMargin: 1.025,
   maxRepsFor1RM: 12,
   suspiciousWeightFactor: 1.5,
 } as const;
@@ -66,8 +67,9 @@ export function estimate1RM(weight: number, reps: number): number | null {
   return weight * (1 + reps / 30);
 }
 
-export function bossHp(base: number): number {
-  return base * RULES.bossMargin;
+/** Marca a superar para quebrar o recorde (base + 2,5%). */
+export function recordTarget(base: number): number {
+  return base * RULES.recordMargin;
 }
 
 /** Pede confirmação se a carga for muito acima da maior já registrada no exercício. */
@@ -75,6 +77,14 @@ export function isSuspiciousWeight(workouts: Workout[], exerciseId: string, weig
   let max = 0;
   for (const w of workouts) for (const s of w.sets) if (s.exerciseId === exerciseId) max = Math.max(max, s.weight);
   return max > 0 && weight > max * RULES.suspiciousWeightFactor;
+}
+
+/** XP bruto de uma sessão de cardio (antes de multiplicador). */
+export function cardioXp(exerciseId: string, minutes: number, distance = 0): number {
+  const ex = EXERCISE_BY_ID[exerciseId];
+  if (!ex || ex.kind !== 'cardio') return 0;
+  const mins = Math.max(0, Math.min(RULES.maxCardioMinutes, minutes));
+  return mins * (ex.perMinute ?? 1) + Math.max(0, distance) * (ex.perKm ?? 0);
 }
 
 // ---------- Semanas ----------
@@ -105,22 +115,25 @@ export function streakMultiplier(streak: number): number {
 
 // ---------- Simulação completa ----------
 
-export interface BossState {
-  base: number | null; // 1RM estimado na última vitória (ou primeira marca)
-  best: number | null; // melhor 1RM estimado já registrado
-  defeats: number;
+export interface RecordState {
+  base: number; // 1RM estimado na última quebra de recorde (ou primeira marca)
+  best: number; // melhor 1RM estimado já registrado
+  beaten: number;
 }
 
 export interface WorkoutResult {
   xpTotal: number;
   attrXp: Record<Attribute, number>;
   bonuses: { label: string; xp: number }[];
-  bossDefeats: BossId[];
+  records: string[]; // exercícios com recorde quebrado
   achievements: AchievementId[];
   fatigued: Attribute[];
   multiplier: number;
   levelBefore: number;
   levelAfter: number;
+  campaignBefore: CampaignState;
+  campaignAfter: CampaignState;
+  distance: number;
 }
 
 export interface Progress {
@@ -128,7 +141,9 @@ export interface Progress {
   level: LevelInfo;
   attrXp: Record<Attribute, number>;
   attrLevels: Record<Attribute, LevelInfo>;
-  bosses: Record<BossId, BossState>;
+  records: Record<string, RecordState>;
+  campaign: CampaignState;
+  distanceTotal: number;
   /** Semanas de constância acumuladas ao entrar na semana atual. */
   streak: number;
   multiplier: number;
@@ -145,8 +160,9 @@ export interface AchievementStats {
   workoutsDone: number;
   weeksCompleted: number;
   bestWeekRun: number;
-  bossDefeatsTotal: number;
   bossesDefeated: number;
+  recordsBeaten: number;
+  distanceTotal: number;
   attrLevels: Record<Attribute, number>;
   deloadsDone: number;
   bestRirRun: number;
@@ -197,9 +213,7 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
 
   let totalXp = 0;
   const attrXp = zeroAttrs();
-  const bosses = Object.fromEntries(
-    BOSS_IDS.map((b) => [b, { base: null, best: null, defeats: 0 } as BossState]),
-  ) as Record<BossId, BossState>;
+  const records: Record<string, RecordState> = {};
   const weekSetCount = new Map<string, Record<Attribute, number>>();
   const weekDaysSoFar = new Map<string, Set<string>>();
   const weeksAwarded = new Set<string>();
@@ -209,8 +223,9 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     workoutsDone: 0,
     weeksCompleted: 0,
     bestWeekRun: 0,
-    bossDefeatsTotal: 0,
     bossesDefeated: 0,
+    recordsBeaten: 0,
+    distanceTotal: 0,
     attrLevels: zeroAttrs(),
     deloadsDone: 0,
     bestRirRun: 0,
@@ -228,12 +243,15 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
       xpTotal: 0,
       attrXp: zeroAttrs(),
       bonuses: [],
-      bossDefeats: [],
+      records: [],
       achievements: [],
       fatigued: [],
       multiplier,
       levelBefore,
       levelAfter: levelBefore,
+      campaignBefore: campaignAt(totalXp),
+      campaignAfter: campaignAt(totalXp),
+      distance: 0,
     };
     const counts = weekSetCount.get(wk) ?? zeroAttrs();
     weekSetCount.set(wk, counts);
@@ -244,7 +262,8 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
 
       let xp: number;
       if (ex.kind === 'cardio') {
-        xp = Math.max(0, s.reps) * XP.cardioPerMinute;
+        xp = cardioXp(ex.id, s.reps, s.distance ?? 0);
+        result.distance += Math.max(0, s.distance ?? 0);
       } else {
         const effective = !s.warmup && (s.rir === null || s.rir <= 3);
         xp = effective ? XP.effectiveSet : XP.weakSet;
@@ -263,20 +282,24 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
           stats.bestRirRun = Math.max(stats.bestRirRun, rirRun);
         }
 
-        // Chefes
-        if (ex.bossId && !s.warmup) {
+        // Recordes pessoais (qualquer exercício de força)
+        if (!s.warmup) {
           const e = estimate1RM(s.weight, s.reps);
-          const boss = bosses[ex.bossId];
           if (e !== null) {
-            boss.best = Math.max(boss.best ?? 0, e);
-            if (boss.base === null) {
-              boss.base = e;
-            } else if (e > bossHp(boss.base)) {
-              boss.base = e;
-              boss.defeats++;
-              stats.bossDefeatsTotal++;
-              result.bossDefeats.push(ex.bossId);
-              result.bonuses.push({ label: `Chefe derrotado: ${ex.name}`, xp: XP.bossBonus });
+            const r = records[ex.id];
+            if (!r) {
+              records[ex.id] = { base: e, best: e, beaten: 0 };
+            } else {
+              r.best = Math.max(r.best, e);
+              if (e > recordTarget(r.base)) {
+                r.base = e;
+                r.beaten++;
+                if (!result.records.includes(ex.id)) {
+                  stats.recordsBeaten++;
+                  result.records.push(ex.id);
+                  result.bonuses.push({ label: `Recorde: ${ex.name}`, xp: XP.recordBonus });
+                }
+              }
             }
           }
         }
@@ -316,10 +339,12 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     for (const b of result.bonuses) result.xpTotal += b.xp;
     totalXp += result.xpTotal;
     result.levelAfter = levelInfo(totalXp).level;
+    result.campaignAfter = campaignAt(totalXp);
+    stats.distanceTotal += result.distance;
 
     // Conquistas
     stats.workoutsDone++;
-    stats.bossesDefeated = BOSS_IDS.filter((b) => bosses[b].defeats > 0).length;
+    stats.bossesDefeated = result.campaignAfter.defeated;
     for (const a of ATTRIBUTES) stats.attrLevels[a] = levelInfo(attrXp[a], 0.5).level;
     for (const ach of ACHIEVEMENTS) {
       if (!achievements[ach.id] && ach.check(stats)) {
@@ -341,7 +366,9 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     level: levelInfo(totalXp),
     attrXp,
     attrLevels: Object.fromEntries(ATTRIBUTES.map((a) => [a, levelInfo(attrXp[a], 0.5)])) as Record<Attribute, LevelInfo>,
-    bosses,
+    records,
+    campaign: campaignAt(totalXp),
+    distanceTotal: stats.distanceTotal,
     streak,
     multiplier: streakMultiplier(streak),
     week: { key: currentWeek, days: daysThisWeek, goal: settings.weeklyGoal, done: weekComplete(currentWeek) },
