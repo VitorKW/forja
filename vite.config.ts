@@ -1,4 +1,4 @@
-/// <reference types="vitest/config" />
+﻿/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -22,8 +22,8 @@ export default defineConfig({
         short_name: 'Forja',
         description: 'Cada série forja seu personagem.',
         lang: 'pt-BR',
-        theme_color: '#16120f',
-        background_color: '#16120f',
+        theme_color: '#0d0b0a',
+        background_color: '#0d0b0a',
         display: 'standalone',
         orientation: 'portrait',
         start_url: base,

@@ -36,7 +36,9 @@ export default function Bosses() {
         <p className="small center">
           {damage === 0 && defeated === 0
             ? 'Conclua um treino para dar o primeiro golpe.'
-            : `Uns ${workoutsLeft} treino${workoutsLeft > 1 ? 's' : ''} típico${workoutsLeft > 1 ? 's' : ''} para derrubá-lo.`}
+            : workoutsLeft === 1
+              ? 'Mais um treino típico deve derrubá-lo.'
+              : `Uns ${workoutsLeft} treinos típicos para derrubá-lo.`}
         </p>
       </section>
 

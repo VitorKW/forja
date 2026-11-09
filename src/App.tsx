@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useProfile, useStore } from './store';
 import Home from './screens/Home';
 import WorkoutScreen from './screens/WorkoutScreen';
@@ -7,7 +8,7 @@ import Bosses from './screens/Bosses';
 import Profile from './screens/Profile';
 import { Icon } from './components/ui';
 
-type Tab = 'forja' | 'chefes' | 'perfil';
+export type Tab = 'forja' | 'chefes' | 'perfil';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'forja', label: 'Forja' },
@@ -15,52 +16,95 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'perfil', label: 'Perfil' },
 ];
 
-function ProfileTabs() {
+const spring = { type: 'spring', stiffness: 520, damping: 38 } as const;
+
+function ProfileSwitch() {
   const profiles = useStore((s) => s.profiles);
   const currentId = useStore((s) => s.currentId);
   const switchProfile = useStore((s) => s.switchProfile);
   return (
-    <div className="profile-tabs" role="tablist" aria-label="Quem está treinando">
-      {profiles.map((p) => (
-        <button
-          key={p.id}
-          role="tab"
-          aria-selected={p.id === currentId}
-          className={p.id === currentId ? 'on' : ''}
-          onClick={() => switchProfile(p.id)}
-        >
-          {p.name}
-          {p.active && <span className="live-dot" aria-label="treino em andamento" />}
-        </button>
-      ))}
+    <div className="profile-switch" role="tablist" aria-label="Quem está treinando">
+      {profiles.map((p) => {
+        const on = p.id === currentId;
+        return (
+          <button key={p.id} role="tab" aria-selected={on} className={on ? 'on' : ''} onClick={() => switchProfile(p.id)}>
+            {on && <motion.span layoutId="profile-pill" className="pill" transition={spring} />}
+            <span className="avatar" aria-hidden>
+              {p.name.trim().charAt(0).toUpperCase() || '?'}
+            </span>
+            <span className="name">{p.name}</span>
+            {p.active && <span className="live-dot" aria-label="treino em andamento" />}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('forja');
-  const { active } = useProfile();
+  const { active, id } = useProfile();
   const summaryId = useStore((s) => s.summaryId);
+  const startWorkout = useStore((s) => s.startWorkout);
 
-  if (active) return <WorkoutScreen />;
-  if (summaryId) return <Summary workoutId={summaryId} />;
+  let content;
+  if (active) content = <WorkoutScreen key="treino" />;
+  else if (summaryId) content = <Summary key={`resumo-${summaryId}`} workoutId={summaryId} />;
+  else
+    content = (
+      <div className="app" key="abas">
+        <header className="topbar">
+          <ProfileSwitch />
+        </header>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.main
+            key={`${tab}-${id}`}
+            className="screen"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
+            {tab === 'forja' && <Home onOpenBosses={() => setTab('chefes')} />}
+            {tab === 'chefes' && <Bosses />}
+            {tab === 'perfil' && <Profile />}
+          </motion.main>
+        </AnimatePresence>
+        <div className="dock">
+          <nav className="tabbar" aria-label="Seções">
+            {TABS.map((t) => {
+              const on = tab === t.id;
+              return (
+                <button key={t.id} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined} onClick={() => setTab(t.id)}>
+                  {on && <motion.span layoutId="tab-pill" className="pill" transition={spring} />}
+                  <Icon name={t.id} />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <motion.button className="fab" onClick={startWorkout} whileTap={{ scale: 0.92 }} aria-label="Começar treino">
+            <Icon name="forja" />
+            <span>Treinar</span>
+          </motion.button>
+        </div>
+      </div>
+    );
 
   return (
-    <div className="app">
-      <ProfileTabs />
-      <main className="screen">
-        {tab === 'forja' && <Home />}
-        {tab === 'chefes' && <Bosses />}
-        {tab === 'perfil' && <Profile />}
-      </main>
-      <nav className="tabbar">
-        {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
-            <Icon name={t.id} />
-            {t.label}
-          </button>
-        ))}
-      </nav>
-    </div>
+    <MotionConfig reducedMotion="user">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={active ? 'treino' : summaryId ? 'resumo' : 'abas'}
+          // Só opacidade: transform aqui quebraria o position: fixed da barra de baixo.
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
+          {content}
+        </motion.div>
+      </AnimatePresence>
+    </MotionConfig>
   );
 }
