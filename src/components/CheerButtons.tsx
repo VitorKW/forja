@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { CHEERS } from '../game/extras';
 import { currentProfile, useStore } from '../store';
+import { notifyPartner } from '../push';
 
 /** Botões de incentivo num treino do par. Depois de mandar, mostra o que foi enviado. */
 export default function CheerButtons({ toProfileId, workoutId }: { toProfileId: string; workoutId: string }) {
@@ -27,6 +28,12 @@ export default function CheerButtons({ toProfileId, workoutId }: { toProfileId: 
           title={c.label}
           onClick={() => {
             sendCheer(toProfileId, workoutId, c.id);
+            const s = useStore.getState();
+            notifyPartner(s.profiles.findIndex((p) => p.id === s.currentId), {
+              title: `${myName}: ${c.label} ${c.icon}`,
+              body: 'Incentivo no seu treino (+15 XP).',
+              tag: `incentivo-${workoutId}`,
+            });
             navigator.vibrate?.(20);
           }}
         >

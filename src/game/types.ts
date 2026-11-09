@@ -47,6 +47,8 @@ export interface Workout {
 export interface Settings {
   weeklyGoal: number; // 2 a 6
   unit: 'kg' | 'lb';
+  /** Descanso entre séries, em segundos (padrão 90). */
+  restSeconds?: number;
 }
 
 /** Ficha de treino: uma lista de exercícios para não ter que escolher um por um. */

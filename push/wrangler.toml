@@ -1,0 +1,17 @@
+﻿# Servidor de notificações do Forja. Ver push/README.md.
+name = "forja-push"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+# Lembrete da noite: 23h UTC = 20h em Brasília.
+[triggers]
+crons = ["0 23 * * *"]
+
+[[kv_namespaces]]
+binding = "FORJA"
+id = "COLOCAR_ID_DO_KV"
+
+[vars]
+VAPID_PUBLIC = "BAMOJSIp_M5DsOYZS-ewSD3SD6uLt7wDI9WDsMh5vq2MCkjrchuzZjQUZmRkPr1-7UNVX2sIVpSfqrNbGDcfNX0"
+VAPID_SUBJECT = "https://vitorkw.github.io/forja/"
+ALLOWED_ORIGINS = "https://vitorkw.github.io"

@@ -7,6 +7,8 @@ import { dayKey, weekKey } from '../game/rules';
 import { JOINT } from '../game/duo';
 import { SEASON_TIERS, SEASON_WIN_COINS, tiersReached } from '../game/season';
 import { useGame } from '../useProgress';
+import Bets from '../components/Bets';
+import YearCalendar from '../components/YearCalendar';
 
 const rise = (i: number) => ({
   initial: { opacity: 0, y: 14 },
@@ -135,6 +137,10 @@ export default function Duo() {
         )}
       </motion.section>
 
+      <motion.div {...rise(2)}>
+        <Bets />
+      </motion.div>
+
       <motion.section className="card joint" {...rise(2)}>
         <div className="couple-num">
           <span className="num">{joint.length}</span>
@@ -205,6 +211,10 @@ export default function Duo() {
           ))}
         </ul>
       </motion.section>
+
+      <motion.div {...rise(6)}>
+        <YearCalendar names={[profiles[0].name, profiles[1].name]} workouts={[profiles[0].workouts, profiles[1].workouts]} />
+      </motion.div>
 
       {received.length > 0 && (
         <motion.section className="card" {...rise(6)}>

@@ -12,6 +12,8 @@ import { TIER_NAME } from '../components/Character';
 import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import type { Attribute } from '../game/types';
+import { PushPanel } from '../components/PushPanel';
+import BackupPanel from '../components/BackupPanel';
 
 const GEAR: Record<Attribute, string> = {
   empurrar: 'Ombreiras',
@@ -232,7 +234,11 @@ export default function Profile() {
         </ul>
       </section>
 
+      <PushPanel />
+
       <SyncPanel />
+
+      <BackupPanel />
 
       <section className="panel">
         <h2>Configurações</h2>

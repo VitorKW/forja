@@ -4,6 +4,7 @@ import { defaultGoals, dietHabits, mergeHabits, type DietGoals } from './game/di
 import { cheerEvents, fullHabitDays, habitEvents, type HabitLog, type XpEvent } from './game/extras';
 import { computeProgress, type Progress } from './game/rules';
 import { computeSeasons, type SeasonState } from './game/season';
+import { computeBets } from './game/bets';
 import { coinsEarned, coinsSpent } from './game/shop';
 import { useStore, type Profile } from './store';
 
@@ -62,6 +63,22 @@ export function useGame() {
     [profiles.length, timelines],
   );
 
+  const bets = useMemo(
+    () =>
+      profiles.length < 2
+        ? { list: [], coins: [0, 0] as [number, number] }
+        : computeBets(
+            [0, 1].map((i) => ({
+              bets: profiles[i].bets ?? [],
+              answers: profiles[i].betAnswers ?? {},
+              workouts: profiles[i].workouts,
+              timeline: timelines[i],
+              habits: habits[i],
+            })) as [Parameters<typeof computeBets>[0][0], Parameters<typeof computeBets>[0][1]],
+          ),
+    [profiles, timelines, habits],
+  );
+
   const coins = useMemo(() => {
     const p = profiles[me];
     const earned = coinsEarned({
@@ -71,9 +88,10 @@ export function useGame() {
       duo: duo ? { state: duo, me } : null,
       jointWorkouts: joint.length,
       seasonCoins: season?.coins[me] ?? 0,
+      betCoins: bets.coins[me],
     });
     return { earned, balance: earned - coinsSpent(p.purchases ?? []) };
-  }, [profiles, all, duo, me, habits, joint, season]);
+  }, [profiles, all, duo, me, habits, joint, season, bets]);
 
   return {
     profiles,
@@ -84,6 +102,7 @@ export function useGame() {
     coins,
     joint,
     season,
+    bets,
     habits,
     timelines,
     progress: all[me],

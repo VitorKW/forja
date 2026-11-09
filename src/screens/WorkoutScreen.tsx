@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stepper, fmt } from '../components/ui';
+import RestTimer, { unlockSound, useRest } from '../components/RestTimer';
 import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
 import { cardioXp, computeProgress, isSuspiciousWeight, suggestLoad } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
-import { useProfile, useStore } from '../store';
+import { currentProfile, useProfile, useStore } from '../store';
+import { notifyPartner } from '../push';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -13,7 +15,7 @@ const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '4+', value: 4 },
   { label: '?', value: null },
 ];
-const REST_SECONDS = 90;
+const REST_OPTIONS = [45, 60, 90, 120, 150, 180, 240];
 
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(Date.now());
@@ -31,7 +33,8 @@ function mmss(sec: number) {
 
 export default function WorkoutScreen() {
   const { active, workouts, settings, templates = [] } = useProfile();
-  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate } = useStore();
+  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate, updateSettings } = useStore();
+  const restSeconds = settings.restSeconds ?? 90;
   const [queue, setQueue] = useState<Template | null>(null);
   const now = useNow();
   const [exercise, setExercise] = useState<Exercise | null>(null);
@@ -41,7 +44,8 @@ export default function WorkoutScreen() {
   const [distance, setDistance] = useState(0);
   const [rir, setRir] = useState<number | null>(2);
   const [warmup, setWarmup] = useState(false);
-  const [restUntil, setRestUntil] = useState<number | null>(null);
+  const timer = useRest(active?.id ?? '');
+  const stopRest = useCallback(() => timer.stop(), [timer.stop]); // eslint-disable-line react-hooks/exhaustive-deps
   const [floaters, setFloaters] = useState<{ id: number; text: string }[]>([]);
   const floaterId = useRef(0);
 
@@ -70,7 +74,6 @@ export default function WorkoutScreen() {
   if (!active) return null;
 
   const elapsed = (now - new Date(active.startedAt).getTime()) / 1000;
-  const rest = restUntil ? (restUntil - now) / 1000 : 0;
   const cardio = exercise?.kind === 'cardio';
   const suggestion = exercise && !cardio ? suggestLoad(workouts, exercise.id) : null;
   const doneIds = new Set(active.sets.map((s) => s.exerciseId));
@@ -111,7 +114,8 @@ export default function WorkoutScreen() {
       return;
     }
     addSet({ exerciseId: exercise.id, weight, reps, rir: warmup ? null : rir, warmup });
-    if (!cardio) setRestUntil(Date.now() + REST_SECONDS * 1000);
+    unlockSound();
+    timer.start(warmup ? Math.min(60, restSeconds) : restSeconds);
   };
 
   const finish = () => {
@@ -119,7 +123,15 @@ export default function WorkoutScreen() {
       if (confirm('Nenhuma série registrada. Sair do treino?')) discardWorkout();
       return;
     }
+    const s = useStore.getState();
+    const name = currentProfile(s).name;
+    const series = active.sets.filter((x) => !x.warmup).length;
     finishWorkout();
+    notifyPartner(s.profiles.findIndex((p) => p.id === s.currentId), {
+      title: `${name} terminou o treino 💪`,
+      body: `${series} ${series === 1 ? 'registro' : 'registros'}, +${preview} XP. Manda um incentivo!`,
+      tag: 'treino',
+    });
   };
 
   // Agrupa as séries por exercício, na ordem em que apareceram.
@@ -241,14 +253,6 @@ export default function WorkoutScreen() {
           )
         )}
 
-        {rest > 0 && (
-          <div className="rest">
-            <span>Descanso: {mmss(rest)}</span>
-            <button className="link" onClick={() => setRestUntil(null)}>
-              Pular
-            </button>
-          </div>
-        )}
 
         {groups.map((g) => (
           <section key={g.ex.id} className="panel compact">
@@ -297,7 +301,18 @@ export default function WorkoutScreen() {
             Concluir treino
           </button>
         </div>
+        <div className="rest-setting muted small">
+          Descanso entre séries:
+          <select value={restSeconds} onChange={(e) => updateSettings({ restSeconds: Number(e.target.value) })} aria-label="Descanso entre séries">
+            {REST_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {mmss(s)}
+              </option>
+            ))}
+          </select>
+        </div>
       </main>
+      <RestTimer rest={timer.rest} now={now} onAdd={(s) => timer.add(s)} onStop={stopRest} />
     </div>
   );
 }

@@ -209,8 +209,17 @@ p { margin: 6px 0; }
 .chip:disabled { opacity: 0.3; }
 .toggle { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
 .toggle input { width: 22px; height: 22px; accent-color: var(--ember); }
-.rest { display: flex; justify-content: space-between; align-items: center; border-radius: 18px; padding: 12px 16px; background: linear-gradient(135deg, #0f2a20, #12201a); border: 1px solid #5ee0a833; font-variant-numeric: tabular-nums; }
-.rest span { font-family: var(--pixel); font-weight: 700; font-size: 1.2rem; color: var(--rest); }
+/* Descanso entre séries: barra fixa embaixo, a faixa verde encolhe até zerar. */
+.rest-bar { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: min(488px, calc(100% - 32px)); z-index: 30; overflow: hidden; border-radius: 20px; background: linear-gradient(135deg, #0f2a20, #12201a); border: 1px solid #5ee0a844; box-shadow: 0 12px 32px #000a; }
+.rest-fill { position: absolute; inset: 0 auto 0 0; background: #5ee0a81f; transition: width 1s linear; }
+.rest-body { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; }
+.rest-time { font-size: 1.7rem; line-height: 1; color: var(--rest); }
+.rest-actions { display: flex; gap: 6px; }
+.rest-btn { min-width: 48px; height: 44px; padding: 0 10px; border-radius: 12px; background: #ffffff10; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rest-btn.skip { color: var(--rest); }
+.rest-bar.go .rest-body { justify-content: center; min-height: 56px; color: var(--rest); }
+.rest-setting { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 72px; }
+.rest-setting select { background: var(--surface-hi); border: 1px solid var(--line-hi); border-radius: 10px; padding: 4px 8px; }
 
 .sets { list-style: none; margin: 0; padding: 0; }
 .sets li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
@@ -498,3 +507,34 @@ p { margin: 6px 0; }
 .recap-list li::before { content: ''; position: absolute; left: 2px; top: 0.5em; width: 9px; height: 9px; border-radius: 50%; background: var(--grad); }
 .versus { padding: 6px 0; border-top: 1px solid var(--line); }
 .versus:first-of-type { border-top: 0; }
+/* v0.8: apostas, calendário do ano, lembretes, backup */
+.bet-form .chips { display: flex; flex-wrap: wrap; }
+.bet-form .chip { padding: 9px 12px; font-family: var(--body); font-size: 0.88rem; font-weight: 700; }
+.bet-form .chip:disabled { opacity: 0.35; }
+.bet-form .search { width: 100%; margin-top: 6px; }
+.bet-form .primary { margin-top: 6px; }
+.bet-list { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 10px; }
+.bet { padding: 12px 14px; border-radius: var(--r-sm); background: var(--well); border: 1px solid var(--line); }
+.bet.proposta { border-style: dashed; border-color: var(--line-hi); }
+.bet.valendo { border-color: #ff8a1f44; }
+.bet-tag { font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 99px; color: var(--ember); background: #ff8a1f1a; white-space: nowrap; }
+.bet-actions { margin-top: 10px; align-items: center; }
+.bet .duel-row { margin-top: 8px; }
+
+.cal { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 4px; }
+.cal-row { display: grid; grid-template-columns: 26px repeat(31, 1fr); gap: 2px; align-items: center; }
+.cal-month { font-size: 0.68rem; font-weight: 700; }
+.cal-cell { aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 2px; background: #ffffff0d; }
+.cal-cell.none { background: transparent; }
+.cal-cell.future { background: #ffffff05; }
+.cal-cell.p0 { background: var(--p0); }
+.cal-cell.p1 { background: var(--p1); }
+.cal-cell.both, .swatch.both { background: linear-gradient(135deg, var(--p0) 50%, var(--p1) 50%); }
+.cal-cell.today { box-shadow: 0 0 0 1.5px var(--text); }
+.cal-cell.picked { box-shadow: 0 0 0 2px var(--gold); position: relative; z-index: 1; }
+.cal-picked { text-align: center; min-height: 1.4em; }
+.cal-legend { flex-wrap: wrap; gap: 8px 16px; }
+
+.push-state { display: flex; align-items: center; gap: 8px; }
+.backup-row { display: flex; gap: 8px; }
+.backup-row > * { flex: 1; }

@@ -10,6 +10,7 @@ import Duo from './screens/Duo';
 import Diet from './screens/Diet';
 import Recap from './screens/Recap';
 import { Icon } from './components/ui';
+import { PushStatusReporter } from './components/PushPanel';
 
 export type Tab = 'forja' | 'dupla' | 'dieta' | 'chefes' | 'perfil';
 
@@ -126,6 +127,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
+      <PushStatusReporter />
       <AnimatePresence mode="wait">
         <motion.div
           key={active ? 'treino' : summaryId ? 'resumo' : recapMonth ? 'retro' : 'abas'}

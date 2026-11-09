@@ -1,0 +1,86 @@
+import { useRef, useState } from 'react';
+import { dayKey } from '../game/rules';
+import { useStore, type Profile } from '../store';
+
+interface BackupFile {
+  app: 'forja';
+  version: 1;
+  exportedAt: string;
+  data: { profiles: Profile[]; currentId: string };
+}
+
+/** Confere se o arquivo parece um backup do Forja. */
+export function parseBackup(text: string): BackupFile | null {
+  try {
+    const b = JSON.parse(text) as BackupFile;
+    const ps = b?.data?.profiles;
+    if (b?.app !== 'forja' || !Array.isArray(ps) || ps.length < 1) return null;
+    if (!ps.every((p) => typeof p?.id === 'string' && typeof p?.name === 'string' && Array.isArray(p?.workouts) && p?.settings)) return null;
+    return b;
+  } catch {
+    return null;
+  }
+}
+
+async function saveFile(text: string, filename: string): Promise<'shared' | 'downloaded'> {
+  const blob = new Blob([text], { type: 'application/json' });
+  const file = new File([blob], filename, { type: 'application/json' });
+  // No iPhone a folha de compartilhar deixa salvar em Arquivos, mandar no WhatsApp etc.
+  if (/iPhone|iPad|Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Backup do Forja' });
+      return 'shared';
+    } catch {
+      /* cancelou: cai para o download */
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return 'downloaded';
+}
+
+export default function BackupPanel() {
+  const restore = useStore((s) => s.restoreBackup);
+  const input = useRef<HTMLInputElement>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const exportAll = async () => {
+    const { profiles, currentId } = useStore.getState();
+    const file: BackupFile = { app: 'forja', version: 1, exportedAt: new Date().toISOString(), data: { profiles, currentId } };
+    const r = await saveFile(JSON.stringify(file), `forja-backup-${dayKey(new Date())}.json`);
+    setNote(r === 'downloaded' ? 'Backup salvo nos downloads.' : 'Backup pronto.');
+  };
+
+  const importFile = async (f: File | undefined) => {
+    if (!f) return;
+    const b = parseBackup(await f.text());
+    if (input.current) input.current.value = '';
+    if (!b) return setNote('Esse arquivo não é um backup do Forja.');
+    const when = new Date(b.exportedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    const total = b.data.profiles.reduce((n, p) => n + p.workouts.length, 0);
+    if (!confirm(`Trocar os dados deste celular pelo backup de ${when} (${total} treinos)? O que não estiver no backup some deste celular.`)) return;
+    restore(b.data);
+    setNote('Backup restaurado.');
+  };
+
+  return (
+    <section className="panel">
+      <h2>Backup</h2>
+      <p className="muted small">Um arquivo com tudo dos dois perfis: treinos, dieta, missões, compras e apostas. Guarde no Drive ou no WhatsApp de vez em quando.</p>
+      <div className="backup-row">
+        <button className="ghost" onClick={exportAll}>
+          Exportar
+        </button>
+        <button className="ghost" onClick={() => input.current?.click()}>
+          Importar
+        </button>
+      </div>
+      <input ref={input} type="file" accept="application/json,.json" hidden onChange={(e) => importFile(e.target.files?.[0])} />
+      {note && <p className="muted small">{note}</p>}
+    </section>
+  );
+}

@@ -48,11 +48,13 @@ export interface CoinSources {
   jointWorkouts?: number;
   /** Moedas de temporada (marcos e troféus). */
   seasonCoins?: number;
+  /** Saldo das apostas encerradas (pode ser negativo). */
+  betCoins?: number;
 }
 
 export function coinsEarned(s: CoinSources): number {
   let c = s.bossesDefeated * COINS.boss + s.achievements * COINS.achievement + s.fullHabitDays * COINS.habitDay;
-  c += (s.jointWorkouts ?? 0) * COINS.joint + (s.seasonCoins ?? 0);
+  c += (s.jointWorkouts ?? 0) * COINS.joint + (s.seasonCoins ?? 0) + (s.betCoins ?? 0);
   if (s.duo) {
     c += s.duo.state.raidsWon * COINS.raid;
     c += s.duo.state.challengeWins[s.duo.me] * COINS.challenge;

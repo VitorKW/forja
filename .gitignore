@@ -4,3 +4,5 @@ dev-dist
 *.log
 *.tsbuildinfo
 art/out
+.dev.vars
+.wrangler

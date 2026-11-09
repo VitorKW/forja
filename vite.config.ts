@@ -16,6 +16,8 @@ export default defineConfig({
       workbox: {
         // Fontes latinas entram no cache para o app funcionar offline com a tipografia certa.
         globPatterns: ['**/*.{js,css,html,svg,png}', '**/*-latin-*.woff2'],
+        // Recebe as notificações (lembretes e avisos do par).
+        importScripts: ['push-sw.js'],
       },
       manifest: {
         name: 'Forja — treino gamificado',
