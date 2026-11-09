@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stepper, fmt } from '../components/ui';
 import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
-import { cardioXp, computeProgress, isSuspiciousWeight } from '../game/rules';
-import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise } from '../game/types';
+import { cardioXp, computeProgress, isSuspiciousWeight, suggestLoad } from '../game/rules';
+import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
 import { useProfile, useStore } from '../store';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
@@ -30,8 +30,9 @@ function mmss(sec: number) {
 }
 
 export default function WorkoutScreen() {
-  const { active, workouts, settings } = useProfile();
-  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout } = useStore();
+  const { active, workouts, settings, templates = [] } = useProfile();
+  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate } = useStore();
+  const [queue, setQueue] = useState<Template | null>(null);
   const now = useNow();
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [picking, setPicking] = useState(true);
@@ -71,6 +72,20 @@ export default function WorkoutScreen() {
   const elapsed = (now - new Date(active.startedAt).getTime()) / 1000;
   const rest = restUntil ? (restUntil - now) / 1000 : 0;
   const cardio = exercise?.kind === 'cardio';
+  const suggestion = exercise && !cardio ? suggestLoad(workouts, exercise.id) : null;
+  const doneIds = new Set(active.sets.map((s) => s.exerciseId));
+
+  const startTemplate = (t: Template) => {
+    setQueue(t);
+    const first = t.exercises.map((id) => EXERCISE_BY_ID[id]).find(Boolean);
+    if (first) choose(first);
+  };
+  const saveAsTemplate = () => {
+    const ids = [...new Set(active.sets.map((s) => s.exerciseId))].filter((id) => EXERCISE_BY_ID[id]);
+    if (!ids.length) return alert('Registre pelo menos um exercício para salvar como ficha.');
+    const name = prompt('Nome da ficha (ex.: Treino A, Pernas):', `Ficha ${templates.length + 1}`);
+    if (name?.trim()) saveTemplate(name.trim().slice(0, 30), ids);
+  };
 
   const choose = (ex: Exercise) => {
     setExercise(ex);
@@ -135,8 +150,24 @@ export default function WorkoutScreen() {
       </header>
 
       <main className="screen">
+        {queue && !picking && (
+          <div className="queue" aria-label={`Ficha ${queue.name}`}>
+            <span className="eyebrow">{queue.name}</span>
+            <div className="queue-chips">
+              {queue.exercises.map((id) => {
+                const ex = EXERCISE_BY_ID[id];
+                if (!ex) return null;
+                return (
+                  <button key={id} className={`qchip${exercise?.id === id ? ' on' : ''}${doneIds.has(id) ? ' done' : ''}`} onClick={() => choose(ex)}>
+                    {ex.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {picking ? (
-          <ExercisePicker onPick={choose} onCancel={exercise ? () => setPicking(false) : undefined} />
+          <ExercisePicker onPick={choose} onCancel={exercise ? () => setPicking(false) : undefined} templates={templates} onTemplate={startTemplate} />
         ) : (
           exercise && (
             <section className="panel">
@@ -167,6 +198,15 @@ export default function WorkoutScreen() {
                 </>
               ) : (
                 <>
+                  {suggestion && (suggestion.weight !== weight || suggestion.reps !== reps) && (
+                    <button className="suggest" onClick={() => { setWeight(suggestion.weight); setReps(suggestion.reps); }}>
+                      <span>
+                        Sugestão: <strong className="num">{fmt(suggestion.weight)} {settings.unit} × {suggestion.reps}</strong>
+                        <span className="muted small"> {suggestion.note}</span>
+                      </span>
+                      <span className="link">Usar</span>
+                    </button>
+                  )}
                   <div className="steppers">
                     <Stepper label="Carga" value={weight} onChange={setWeight} step={2.5} suffix={settings.unit} />
                     <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={1} />
@@ -243,6 +283,12 @@ export default function WorkoutScreen() {
           </span>
         </label>
 
+        {active.sets.length > 0 && !queue && (
+          <button className="link center" onClick={saveAsTemplate}>
+            Salvar estes exercícios como ficha
+          </button>
+        )}
+
         <div className="row gap">
           <button className="ghost" onClick={() => confirm('Descartar este treino?') && discardWorkout()}>
             Descartar
@@ -256,7 +302,17 @@ export default function WorkoutScreen() {
   );
 }
 
-function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; onCancel?: () => void }) {
+function ExercisePicker({
+  onPick,
+  onCancel,
+  templates,
+  onTemplate,
+}: {
+  onPick: (e: Exercise) => void;
+  onCancel?: () => void;
+  templates: Template[];
+  onTemplate: (t: Template) => void;
+}) {
   const [q, setQ] = useState('');
   const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
   const list = EXERCISES.filter((e) => norm(e.name).includes(norm(q)));
@@ -271,7 +327,20 @@ function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; o
           </button>
         )}
       </div>
-      <input className="search" placeholder="Buscar..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+      {templates.length > 0 && !q && (
+        <div className="pick-group">
+          <div className="muted small">Suas fichas</div>
+          <div className="template-list">
+            {templates.map((t) => (
+              <button key={t.id} className="template" onClick={() => onTemplate(t)}>
+                <strong>{t.name}</strong>
+                <span className="muted small">{t.exercises.length} exercícios</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <input className="search" placeholder="Buscar exercício..." value={q} onChange={(e) => setQ(e.target.value)} />
       {[
         { key: 'cardio', label: 'Caminhada, cardio e esportes', items: list.filter((e) => e.kind === 'cardio') },
         ...ATTRIBUTES.map((a) => ({ key: a, label: ATTRIBUTE_LABEL[a], items: list.filter((e) => e.kind === 'forca' && e.primary === a) })),

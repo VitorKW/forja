@@ -191,6 +191,74 @@ for (const [peca, [row, rows]] of Object.entries(PECAS)) {
 }
 sprite("coroa", { w: W, h: H, mx: true, outline: "k" }, grid(0, 0, COROA.join("\n")), glow("uU", { r: 3, strength: 0.4 }))
 
+// ---------- Loja: capas cosméticas ----------
+pal({
+  1: "#6e1022", 2: "#c0203e", 3: "#ff6b82", // rubi
+  4: "#16306e", 5: "#2f62c8", 6: "#7fb0ff", // safira
+  7: "#0f5a3a", 8: "#22a066", 9: "#7ee8b0", // esmeralda
+  D: "#3e1a5e", d: "#7a3db0", E: "#c79bf0", // ametista
+  K: "#7a2e4a", I: "#e0708f", O: "#ffd1a8", // dupla: rosa e dourado
+})
+const CAPAS = {
+  rubi: { L: "1", l: "2", o: "3" },
+  safira: { L: "4", l: "5", o: "6" },
+  esmeralda: { L: "7", l: "8", o: "9" },
+  ametista: { L: "D", l: "d", o: "E" },
+  dupla: { L: "K", l: "I", o: "O" },
+}
+for (const [nome, swap] of Object.entries(CAPAS)) sprite(`capa_${nome}`, { base: "_capa", swap })
+
+// ---------- Loja: bichinhos (16 × 14, de frente, espelhados) ----------
+const PETS = {
+  slime: [
+    "......8",
+    "....888",
+    "...9888",
+    "..99888",
+    ".898888",
+    ".88e888",
+    ".88e888",
+    "8888888",
+    "7888888",
+    "7788888",
+    ".777777",
+  ],
+  gato: [
+    ".q.....",
+    ".qq....",
+    ".qJqqqq",
+    ".qJJJJJ",
+    ".JJewJJ",
+    ".JJeeJJ",
+    "..JJJJS",
+    "..qJJJJ",
+    ".qqJJJz",
+    "qqJJJJz",
+    "qqJJJJz",
+    ".qqqqqq",
+  ],
+  dragao: [
+    "..x....",
+    "..xF...",
+    ".Ffffff",
+    "Ffffffy",
+    "ffewfff",
+    "ffeefff",
+    "Ffffffm",
+    ".Fffyyy",
+    "FFffyyy",
+    "FFFfyyy",
+    ".FFffyy",
+    "..FF.FF",
+  ],
+}
+for (const [nome, rows] of Object.entries(PETS))
+  sprite(`pet_${nome}`, { w: 14, h: 12, mx: true, outline: "k" }, grid(0, 0, rows.join("\n")))
+
+scene("previa_loja", { w: 5 * 36 + 3 * 18, h: 40, bg: "#272a2f" },
+  ...Object.keys(CAPAS).flatMap((nome, i) => [stamp(`capa_${nome}`, i * 36, 0), stamp("corpo_a", i * 36, 0)]),
+  ...Object.keys(PETS).map((nome, i) => stamp(`pet_${nome}`, 180 + i * 18, 20)))
+
 // Prévia: personagem completo em alguns estágios
 scene("previa", { w: 4 * 36, h: 40, bg: "#272a2f" },
   stamp("corpo_a", 0, 0),

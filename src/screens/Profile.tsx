@@ -6,6 +6,7 @@ import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
 import { heatColor } from '../heat';
 import { useProfile, useStore, type Look } from '../store';
 import { useProgress } from '../useProgress';
+import { Evolution, Shop, Templates } from './ProfileExtras';
 import { TIER_NAME } from '../components/Character';
 import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
@@ -116,6 +117,8 @@ export default function Profile() {
         </div>
       </section>
 
+      <Shop />
+
       <section className="panel">
         <h2>Atributos e equipamento</h2>
         {ATTRIBUTES.map((a) => {
@@ -169,6 +172,10 @@ export default function Profile() {
           </>
         )}
       </section>
+
+      <Evolution />
+
+      <Templates />
 
       <section className="panel">
         <div className="row between baseline">

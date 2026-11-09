@@ -6,12 +6,14 @@ import WorkoutScreen from './screens/WorkoutScreen';
 import Summary from './screens/Summary';
 import Bosses from './screens/Bosses';
 import Profile from './screens/Profile';
+import Duo from './screens/Duo';
 import { Icon } from './components/ui';
 
-export type Tab = 'forja' | 'chefes' | 'perfil';
+export type Tab = 'forja' | 'dupla' | 'chefes' | 'perfil';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'forja', label: 'Forja' },
+  { id: 'dupla', label: 'Dupla' },
   { id: 'chefes', label: 'Chefes' },
   { id: 'perfil', label: 'Perfil' },
 ];
@@ -89,7 +91,8 @@ export default function App() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
-            {tab === 'forja' && <Home onOpenBosses={() => setTab('chefes')} />}
+            {tab === 'forja' && <Home onOpenBosses={() => setTab('chefes')} onOpenDuo={() => setTab('dupla')} />}
+            {tab === 'dupla' && <Duo />}
             {tab === 'chefes' && <Bosses />}
             {tab === 'perfil' && <Profile />}
           </motion.main>

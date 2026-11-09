@@ -22,7 +22,8 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import type { Workout } from './game/types';
-import { useStore, type RemoteMeta, type SyncStatus } from './store';
+import { metaOf, useStore, type RemoteMeta, type SyncStatus } from './store';
+import type { Cheer } from './game/extras';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBqcS0gMVEv3PTcUiN3JuvIML1swRJ8fiE',
@@ -65,6 +66,8 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
   // Só envia um perfil depois de ouvir a nuvem de verdade (não só o cache), para não sobrescrever nada.
   const metaReady = SLOTS.map(() => false);
   const workoutsReady = SLOTS.map(() => false);
+  const cheersReady = SLOTS.map(() => false);
+  const remoteCheers = SLOTS.map(() => new Set<string>());
 
   onStatus({ state: 'connecting' });
 
@@ -84,13 +87,22 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
       if (!p) continue;
       const ref = doc(db, 'grupos', code, 'perfis', SLOTS[i]);
       if (metaReady[i]) {
-        const meta: RemoteMeta = { name: p.name, look: p.look, settings: p.settings, metaAt: p.metaAt ?? 0 };
+        const meta = metaOf(p);
         const key = JSON.stringify(meta);
         if (key !== pushedMeta[i] && meta.metaAt > remoteMetaAt[i]) {
-          batch.set(ref, meta);
+          // Guardado como texto: o Firestore não aceita campos indefinidos e assim o formato fica livre.
+          batch.set(ref, { metaAt: meta.metaAt, json: key });
           pushedMeta[i] = key;
           remoteMetaAt[i] = meta.metaAt;
           n++;
+        }
+      }
+      if (cheersReady[i]) {
+        for (const ch of p.cheers ?? []) {
+          if (remoteCheers[i].has(ch.id)) continue;
+          batch.set(doc(ref, 'incentivos', ch.id), { json: JSON.stringify(ch) });
+          remoteCheers[i].add(ch.id);
+          if (++n >= 400) await flush();
         }
       }
       if (!workoutsReady[i]) continue;
@@ -131,9 +143,15 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
             { includeMetadataChanges: true },
             (snap) => {
               if (snap.exists()) {
-                const meta = snap.data() as RemoteMeta;
+                const raw = snap.data() as { json?: string } & RemoteMeta;
+                let meta: RemoteMeta = raw;
+                try {
+                  if (raw.json) meta = { ...(JSON.parse(raw.json) as RemoteMeta), metaAt: raw.metaAt ?? 0 };
+                } catch {
+                  /* documento antigo ou corrompido: usa os campos soltos */
+                }
                 remoteMetaAt[i] = Math.max(remoteMetaAt[i], meta.metaAt ?? 0);
-                pushedMeta[i] = JSON.stringify({ name: meta.name, look: meta.look, settings: meta.settings, metaAt: meta.metaAt });
+                pushedMeta[i] = raw.json ?? '';
                 useStore.getState().mergeRemoteMeta(i, meta);
               }
               if (!snap.metadata.fromCache) {
@@ -172,6 +190,29 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
               if (!snap.metadata.fromCache) {
                 workoutsReady[i] = true;
                 if (workoutsReady.every(Boolean)) onStatus({ state: 'ok' });
+                schedulePush();
+              }
+            },
+            fail,
+          ),
+        );
+        unsubs.push(
+          onSnapshot(
+            collection(ref, 'incentivos'),
+            { includeMetadataChanges: true },
+            (snap) => {
+              const cheers: Cheer[] = [];
+              snap.forEach((d) => {
+                try {
+                  cheers.push(JSON.parse((d.data() as { json: string }).json) as Cheer);
+                  remoteCheers[i].add(d.id);
+                } catch {
+                  /* ignora */
+                }
+              });
+              useStore.getState().mergeRemoteCheers(i, cheers);
+              if (!snap.metadata.fromCache) {
+                cheersReady[i] = true;
                 schedulePush();
               }
             },

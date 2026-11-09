@@ -4,8 +4,10 @@ import { XpBar, fmt } from '../components/ui';
 import { dayKey, levelTitle, RULES } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Attribute } from '../game/types';
 import { heatColor } from '../heat';
-import { useProfile } from '../store';
-import { useProgress } from '../useProgress';
+import { useStore } from '../store';
+import { useGame } from '../useProgress';
+import CheerButtons from '../components/CheerButtons';
+import { HABITS, HABIT_XP } from '../game/extras';
 import BossSprite from '../components/BossSprite';
 
 const DAY_LETTERS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
@@ -47,9 +49,15 @@ function Ring({ value, goal }: { value: number; goal: number }) {
   );
 }
 
-export default function Home({ onOpenBosses }: { onOpenBosses: () => void }) {
-  const p = useProgress();
-  const { workouts, look } = useProfile();
+export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => void; onOpenDuo: () => void }) {
+  const { progress: p, profile, profiles, partner, all, coins } = useGame();
+  const { workouts, look } = profile;
+  const toggleHabit = useStore((s) => s.toggleHabit);
+  const other = profiles[partner];
+  // Treino mais recente do par nos últimos 3 dias, para incentivar.
+  const partnerLast = other?.workouts
+    .filter((w) => w.finishedAt && Date.now() - new Date(w.finishedAt).getTime() < 3 * 86400000)
+    .sort((a, b) => b.finishedAt!.localeCompare(a.finishedAt!))[0];
   const levels = Object.fromEntries(ATTRIBUTES.map((a) => [a, p.attrLevels[a].level])) as Record<Attribute, number>;
   const tired = ATTRIBUTES.filter((a) => p.weekSets[a] > RULES.fatigueSetsPerWeek);
   const close = ATTRIBUTES.filter((a) => p.weekSets[a] >= 16 && p.weekSets[a] <= RULES.fatigueSetsPerWeek);
@@ -58,6 +66,7 @@ export default function Home({ onOpenBosses }: { onOpenBosses: () => void }) {
   const [y, m, d] = p.week.key.split('-').map(Number);
   const trained = new Set(workouts.filter((w) => w.finishedAt).map((w) => dayKey(new Date(w.finishedAt!))));
   const today = dayKey(new Date());
+  const habitsToday = profile.habits?.[today] ?? [];
   const days = DAY_LETTERS.map((letter, i) => {
     const key = dayKey(new Date(y, m - 1, d + i));
     return { letter, name: DAY_NAMES[i], done: trained.has(key), today: key === today };
@@ -74,12 +83,18 @@ export default function Home({ onOpenBosses }: { onOpenBosses: () => void }) {
             <span className="lvl-label">NV</span>
             <span className="lvl-num">{p.level.level}</span>
           </div>
-          <span className="title-chip" style={{ color: heatColor(Math.min(10, p.level.level + 3)) }}>
-            {levelTitle(p.level.level)}
-          </span>
+          <div className="row gap-sm">
+            <span className="coin-chip" aria-label={` moedas`}>
+              <span className="coin" aria-hidden />
+              <span className="num">{coins.balance}</span>
+            </span>
+            <span className="title-chip" style={{ color: heatColor(Math.min(10, p.level.level + 3)) }}>
+              {levelTitle(p.level.level)}
+            </span>
+          </div>
         </div>
         <div className="stage">
-          <Character levels={levels} playerLevel={p.level.level} look={look} />
+          <Character levels={levels} playerLevel={p.level.level} look={look} capa={profile.equipped?.capa} pet={profile.equipped?.pet} />
         </div>
         <div className="hero-xp">
           <XpBar info={p.level} label="Progresso até o próximo nível" />
@@ -120,7 +135,52 @@ export default function Home({ onOpenBosses }: { onOpenBosses: () => void }) {
         </div>
       </motion.section>
 
-      <motion.button className="card boss-card" onClick={onOpenBosses} whileTap={{ scale: 0.98 }} {...rise(2)}>
+      <motion.section className="card habits" {...rise(2)}>
+        <div className="row between baseline">
+          <h2>Missões de hoje</h2>
+          <span className="muted small">+{HABIT_XP} XP cada</span>
+        </div>
+        <div className="habit-list">
+          {HABITS.map((h) => {
+            const on = habitsToday.includes(h.id);
+            return (
+              <motion.button
+                key={h.id}
+                className={`habit${on ? ' on' : ''}`}
+                aria-pressed={on}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  toggleHabit(today, h.id);
+                  if (!on) navigator.vibrate?.(15);
+                }}
+              >
+                <span className="check" aria-hidden />
+                <span>{h.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </motion.section>
+
+      {partnerLast && (
+        <motion.section className="card partner-card" {...rise(3)}>
+          <button className="partner-text" onClick={onOpenDuo}>
+            <span className="avatar" aria-hidden>
+              {other.name.trim().charAt(0).toUpperCase()}
+            </span>
+            <span>
+              <strong>{other.name} treinou</strong>
+              <span className="muted small">
+                {' '}
+                +{all[partner].results[partnerLast.id]?.xpTotal ?? 0} XP
+              </span>
+            </span>
+          </button>
+          <CheerButtons toProfileId={other.id} workoutId={partnerLast.id} />
+        </motion.section>
+      )}
+
+      <motion.button className="card boss-card" onClick={onOpenBosses} whileTap={{ scale: 0.98 }} {...rise(4)}>
         <div className="boss-tile">
           <BossSprite def={boss} px={4} className="breathe" />
         </div>
@@ -138,7 +198,7 @@ export default function Home({ onOpenBosses }: { onOpenBosses: () => void }) {
       </motion.button>
 
       {(tired.length > 0 || close.length > 0) && (
-        <motion.section className="card warn" {...rise(3)}>
+        <motion.section className="card warn" {...rise(5)}>
           {tired.map((a) => (
             <p key={a}>
               {ATTRIBUTE_LABEL[a]} passou de {RULES.fatigueSetsPerWeek} séries nesta semana ({p.weekSets[a]}). Novas séries dele rendem metade do XP.

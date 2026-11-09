@@ -1,0 +1,195 @@
+import { useMemo, useState } from 'react';
+import { motion } from 'motion/react';
+import { BarChart, LineChart, type Point } from '../components/Charts';
+import { fmt } from '../components/ui';
+import { EXERCISE_BY_ID } from '../game/exercises';
+import { dayKey, estimate1RM, weekKey, nextWeek } from '../game/rules';
+import { canBuy, SHOP, type ShopItem } from '../game/shop';
+import { useStore } from '../store';
+import { useGame } from '../useProgress';
+
+const sprite = (name: string) => `${import.meta.env.BASE_URL}sprites/${name}.png`;
+const shortDate = (day: string) => {
+  const [, m, d] = day.split('-');
+  return `${d}/${m}`;
+};
+
+/** Loja: compra e equipa capas e bichinhos com as moedas. */
+export function Shop() {
+  const { profile, coins, duo } = useGame();
+  const { buyItem, equip } = useStore();
+  const purchases = profile.purchases ?? [];
+  const equipped = profile.equipped ?? {};
+
+  const action = (item: ShopItem) => {
+    const owned = purchases.includes(item.id);
+    const on = equipped[item.kind] === item.id;
+    if (owned)
+      return (
+        <button className={on ? 'ghost small-btn' : 'primary small-btn'} onClick={() => equip(item.kind, on ? null : item.id)}>
+          {on ? 'Tirar' : 'Usar'}
+        </button>
+      );
+    if (item.needsRaid && (duo?.raidsWon ?? 0) < 1) return <span className="muted small">Vençam um chefe da semana</span>;
+    const ok = canBuy(item, coins.balance, purchases, duo?.raidsWon ?? 0);
+    return (
+      <button
+        className="primary small-btn"
+        disabled={!ok}
+        onClick={() => confirm(`Comprar ${item.name} por ${item.price} moedas?`) && buyItem(item.id)}
+      >
+        <span className="coin" aria-hidden /> {item.price}
+      </button>
+    );
+  };
+
+  return (
+    <section className="panel">
+      <div className="row between baseline">
+        <h2>Loja</h2>
+        <span className="coin-chip">
+          <span className="coin" aria-hidden />
+          <span className="num">{coins.balance}</span>
+        </span>
+      </div>
+      <p className="muted small">
+        Moedas vêm de chefes, conquistas, dias com as 3 missões, desafios e vitórias em dupla.
+      </p>
+      <div className="shop">
+        {SHOP.map((item) => (
+          <motion.div key={item.id} className={`shop-item${equipped[item.kind] === item.id ? ' on' : ''}`} layout>
+            <div className="shop-art">
+              {item.kind === 'capa' ? (
+                <>
+                  <img src={sprite(`capa_${item.id}`)} alt="" />
+                  <img src={sprite(`corpo_${profile.look}`)} alt="" />
+                </>
+              ) : (
+                <img className="pet-art" src={sprite(`pet_${item.id}`)} alt="" />
+              )}
+            </div>
+            <strong className="small">{item.name}</strong>
+            {action(item)}
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Evolução: XP por semana, recorde estimado por exercício e peso corporal. */
+export function Evolution() {
+  const { profile, progress } = useGame();
+  const logWeight = useStore((s) => s.logWeight);
+  const [kg, setKg] = useState('');
+  const exercises = Object.keys(progress.records).filter((id) => EXERCISE_BY_ID[id]);
+  const [exId, setExId] = useState<string>('');
+  const chosen = exercises.includes(exId) ? exId : exercises[0];
+
+  const weekly: Point[] = useMemo(() => {
+    const sums = new Map<string, number>();
+    for (const w of profile.workouts) {
+      if (!w.finishedAt) continue;
+      const k = weekKey(new Date(w.finishedAt));
+      sums.set(k, (sums.get(k) ?? 0) + (progress.results[w.id]?.xpTotal ?? 0));
+    }
+    // Últimas 12 semanas até a atual, incluindo as vazias.
+    const now = weekKey(new Date());
+    const keys: string[] = [];
+    let k = weekKey(new Date(Date.now() - 11 * 7 * 86400000));
+    while (k <= now) {
+      keys.push(k);
+      k = nextWeek(k);
+    }
+    return keys.map((key) => ({ label: shortDate(key), value: sums.get(key) ?? 0 }));
+  }, [profile.workouts, progress.results]);
+
+  const strength: Point[] = useMemo(() => {
+    if (!chosen) return [];
+    return profile.workouts
+      .filter((w) => w.finishedAt)
+      .sort((a, b) => a.finishedAt!.localeCompare(b.finishedAt!))
+      .flatMap((w) => {
+        const best = Math.max(0, ...w.sets.filter((s) => s.exerciseId === chosen && !s.warmup).map((s) => estimate1RM(s.weight, s.reps) ?? 0));
+        return best > 0 ? [{ label: shortDate(dayKey(new Date(w.finishedAt!))), value: Math.round(best * 10) / 10 }] : [];
+      });
+  }, [profile.workouts, chosen]);
+
+  const weights: Point[] = (profile.bodyWeights ?? []).map((b) => ({ label: shortDate(b.day), value: b.kg }));
+  const save = () => {
+    const v = Number(kg.replace(',', '.'));
+    if (v >= 25 && v <= 300) {
+      logWeight(dayKey(new Date()), Math.round(v * 10) / 10);
+      setKg('');
+    }
+  };
+
+  return (
+    <section className="panel">
+      <h2>Evolução</h2>
+
+      <h3>XP por semana</h3>
+      <BarChart data={weekly} unit="XP" caption="XP por semana nas últimas 12 semanas" />
+
+      <div className="row between baseline chart-head">
+        <h3>Força estimada (1RM)</h3>
+        {exercises.length > 1 && (
+          <select className="mini-select" value={chosen} onChange={(e) => setExId(e.target.value)} aria-label="Exercício">
+            {exercises.map((id) => (
+              <option key={id} value={id}>
+                {EXERCISE_BY_ID[id].name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      {strength.length >= 2 ? (
+        <LineChart data={strength} unit={profile.settings.unit} caption={`1RM estimado em ${EXERCISE_BY_ID[chosen]?.name}`} />
+      ) : (
+        <p className="muted small">Registre o mesmo exercício de força em dois treinos para ver a curva.</p>
+      )}
+
+      <h3 className="chart-head">Peso corporal</h3>
+      {weights.length >= 2 ? (
+        <LineChart data={weights} unit="kg" caption="Peso corporal ao longo do tempo" />
+      ) : (
+        <p className="muted small">{weights.length === 1 ? `Último registro: ${fmt(weights[0].value)} kg.` : 'Registre seu peso de vez em quando para acompanhar.'}</p>
+      )}
+      <div className="sync-join">
+        <input className="search" inputMode="decimal" placeholder="Peso de hoje (kg)" value={kg} onChange={(e) => setKg(e.target.value)} aria-label="Peso de hoje em kg" />
+        <button className="ghost" onClick={save}>
+          Registrar
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Fichas salvas: ver e apagar. */
+export function Templates() {
+  const { profile } = useGame();
+  const deleteTemplate = useStore((s) => s.deleteTemplate);
+  const templates = profile.templates ?? [];
+  return (
+    <section className="panel">
+      <h2>Fichas de treino</h2>
+      {templates.length === 0 ? (
+        <p className="muted small">Durante um treino, toque em "Salvar estes exercícios como ficha". Na próxima vez, é só escolher a ficha.</p>
+      ) : (
+        <ul className="records">
+          {templates.map((t) => (
+            <li key={t.id}>
+              <div>
+                <strong>{t.name}</strong>
+                <div className="muted small">{t.exercises.map((id) => EXERCISE_BY_ID[id]?.name).filter(Boolean).join(', ')}</div>
+              </div>
+              <button className="icon-btn" aria-label={`Apagar ficha ${t.name}`} onClick={() => confirm(`Apagar a ficha ${t.name}?`) && deleteTemplate(t.id)}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

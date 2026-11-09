@@ -11,7 +11,10 @@ export default function BossSprite({
   hidden,
   defeated,
   className,
+  sprite,
 }: {
+  /** Nome de outro PNG (ex.: chefe da semana em dupla). */
+  sprite?: string;
   def: BossDef;
   px?: number;
   hidden?: boolean;
@@ -22,7 +25,7 @@ export default function BossSprite({
   const cls = ['boss-sprite', hidden && 'hidden', defeated && 'defeated', className].filter(Boolean).join(' ');
   return (
     <img
-      src={`${import.meta.env.BASE_URL}sprites/${bossSpriteName(def)}.png`}
+      src={`${import.meta.env.BASE_URL}sprites/${sprite ?? bossSpriteName(def)}.png`}
       width={size}
       height={size}
       className={cls}

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { SetEntry, Settings, Workout } from './game/types';
+import type { BodyWeight, SetEntry, Settings, Template, Workout } from './game/types';
+import type { Cheer, CheerKind, HabitId, HabitLog } from './game/extras';
+import type { ItemKind } from './game/shop';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -18,6 +20,15 @@ export interface Profile {
   metaAt?: number;
   /** Treinos apagados: a sincronização avisa o outro celular para não trazê-los de volta. */
   deleted?: string[];
+  /** Missões diárias cumpridas. */
+  habits?: HabitLog;
+  /** Incentivos recebidos do par. */
+  cheers?: Cheer[];
+  templates?: Template[];
+  /** Itens comprados na loja (ids). */
+  purchases?: string[];
+  equipped?: Partial<Record<ItemKind, string>>;
+  bodyWeights?: BodyWeight[];
 }
 
 /** Dados de perfil que vêm da nuvem. */
@@ -26,6 +37,28 @@ export interface RemoteMeta {
   look: Look;
   settings: Settings;
   metaAt: number;
+  habits?: HabitLog;
+  templates?: Template[];
+  purchases?: string[];
+  equipped?: Partial<Record<ItemKind, string>>;
+  bodyWeights?: BodyWeight[];
+}
+
+/** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights'] as const;
+
+export function metaOf(p: Profile): RemoteMeta {
+  return {
+    name: p.name,
+    look: p.look,
+    settings: p.settings,
+    metaAt: p.metaAt ?? 0,
+    habits: p.habits ?? {},
+    templates: p.templates ?? [],
+    purchases: p.purchases ?? [],
+    equipped: p.equipped ?? {},
+    bodyWeights: p.bodyWeights ?? [],
+  };
 }
 
 export type SyncStatus = { state: 'connecting' | 'ok' | 'error'; message?: string };
@@ -74,6 +107,15 @@ interface State {
   setSyncCode: (code: string | null) => void;
   mergeRemoteMeta: (slot: number, meta: RemoteMeta) => void;
   mergeRemoteWorkouts: (slot: number, live: Workout[], dead: string[]) => void;
+  mergeRemoteCheers: (slot: number, cheers: Cheer[]) => void;
+
+  toggleHabit: (day: string, habit: HabitId) => void;
+  sendCheer: (toProfileId: string, workoutId: string, kind: CheerKind) => void;
+  saveTemplate: (name: string, exercises: string[]) => void;
+  deleteTemplate: (id: string) => void;
+  buyItem: (id: string) => void;
+  equip: (kind: ItemKind, id: string | null) => void;
+  logWeight: (day: string, kg: number) => void;
 }
 
 const initialProfiles = [newProfile(DEFAULT_NAMES[0], 'a'), newProfile(DEFAULT_NAMES[1], 'b')];
@@ -133,10 +175,52 @@ export const useStore = create<State>()(
           updateAt(slot, (p) => {
             const local = p.metaAt ?? 0;
             if (!(meta.metaAt > local || (local === 0 && meta.metaAt >= 0))) return null;
-            if (p.name === meta.name && p.look === meta.look && JSON.stringify(p.settings) === JSON.stringify(meta.settings) && local === meta.metaAt)
-              return null;
-            return { name: meta.name, look: meta.look, settings: meta.settings, metaAt: meta.metaAt };
+            const incoming = { ...metaOf({ ...p, ...meta }), metaAt: meta.metaAt };
+            if (JSON.stringify(incoming) === JSON.stringify(metaOf(p))) return null;
+            return incoming;
           }),
+        mergeRemoteCheers: (slot, cheers) =>
+          updateAt(slot, (p) => {
+            const have = new Set((p.cheers ?? []).map((c) => c.id));
+            const added = cheers.filter((c) => !have.has(c.id));
+            return added.length ? { cheers: [...(p.cheers ?? []), ...added] } : null;
+          }),
+
+        toggleHabit: (day, habit) =>
+          update((p) => {
+            const log = { ...(p.habits ?? {}) };
+            const today = log[day] ?? [];
+            log[day] = today.includes(habit) ? today.filter((h) => h !== habit) : [...today, habit];
+            if (!log[day].length) delete log[day];
+            return { habits: log, metaAt: Date.now() };
+          }),
+        sendCheer: (toProfileId, workoutId, kind) => {
+          const from = currentProfile(get()).name;
+          set({
+            profiles: get().profiles.map((p) =>
+              p.id === toProfileId
+                ? { ...p, cheers: [...(p.cheers ?? []), { id: uid(), workoutId, kind, from, at: new Date().toISOString() }] }
+                : p,
+            ),
+          });
+        },
+        saveTemplate: (name, exercises) =>
+          update((p) => ({ templates: [...(p.templates ?? []), { id: uid(), name, exercises }], metaAt: Date.now() })),
+        deleteTemplate: (id) => update((p) => ({ templates: (p.templates ?? []).filter((t) => t.id !== id), metaAt: Date.now() })),
+        buyItem: (id) =>
+          update((p) => (p.purchases?.includes(id) ? {} : { purchases: [...(p.purchases ?? []), id], metaAt: Date.now() })),
+        equip: (kind, id) =>
+          update((p) => {
+            const equipped = { ...(p.equipped ?? {}) };
+            if (id) equipped[kind] = id;
+            else delete equipped[kind];
+            return { equipped, metaAt: Date.now() };
+          }),
+        logWeight: (day, kg) =>
+          update((p) => ({
+            bodyWeights: [...(p.bodyWeights ?? []).filter((b) => b.day !== day), { day, kg }].sort((a, b) => a.day.localeCompare(b.day)),
+            metaAt: Date.now(),
+          })),
         // Junta os treinos: soma os que faltam aqui e tira os que foram apagados lá.
         mergeRemoteWorkouts: (slot, live, dead) =>
           updateAt(slot, (p) => {

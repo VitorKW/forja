@@ -7,6 +7,7 @@ import { EXERCISE_BY_ID } from './exercises';
 import { ACHIEVEMENTS, type AchievementId } from './achievements';
 import { campaignAt, type CampaignState } from './campaign';
 import { ATTRIBUTES, type Attribute, type Settings, type Workout } from './types';
+import type { XpEvent } from './extras';
 
 export const XP = {
   effectiveSet: 10,
@@ -87,6 +88,26 @@ export function cardioXp(exerciseId: string, minutes: number, distance = 0): num
   return mins * (ex.perMinute ?? 1) + Math.max(0, distance) * (ex.perKm ?? 0);
 }
 
+/**
+ * Sugestão de carga para a próxima série, olhando a última sessão do exercício.
+ * Progressão dupla simples: chegou a 12 reps (ou sobrou bastante, RIR 3+) em todas as
+ * séries de trabalho? Sobe 2,5. Senão, mantém a carga e busca mais reps.
+ */
+export function suggestLoad(workouts: Workout[], exerciseId: string): { weight: number; reps: number; note: string } | null {
+  const done = workouts.filter((w) => w.finishedAt).sort((a, b) => b.finishedAt!.localeCompare(a.finishedAt!));
+  for (const w of done) {
+    const sets = w.sets.filter((s) => s.exerciseId === exerciseId && !s.warmup && s.weight > 0);
+    if (!sets.length) continue;
+    const top = Math.max(...sets.map((s) => s.weight));
+    const work = sets.filter((s) => s.weight === top);
+    const reps = Math.min(...work.map((s) => s.reps));
+    const easy = work.every((s) => s.reps >= 12 || (s.rir !== null && s.rir >= 3));
+    if (easy) return { weight: top + 2.5, reps: Math.max(6, reps - 4), note: 'Da última vez sobrou fôlego: suba a carga.' };
+    return { weight: top, reps: reps + 1, note: 'Mesma carga da última vez: tente uma rep a mais.' };
+  }
+  return null;
+}
+
 // ---------- Semanas ----------
 
 function pad(n: number) {
@@ -138,6 +159,8 @@ export interface WorkoutResult {
 
 export interface Progress {
   totalXp: number;
+  /** XP vindo de fora dos treinos (missões e incentivos). */
+  bonusXp: number;
   level: LevelInfo;
   attrXp: Record<Attribute, number>;
   attrLevels: Record<Attribute, LevelInfo>;
@@ -171,7 +194,8 @@ export interface AchievementStats {
 const zeroAttrs = (): Record<Attribute, number> =>
   Object.fromEntries(ATTRIBUTES.map((a) => [a, 0])) as Record<Attribute, number>;
 
-export function computeProgress(workouts: Workout[], settings: Settings, now: Date = new Date()): Progress {
+/** extras: XP de missões e incentivos, encaixado na linha do tempo junto com os treinos. */
+export function computeProgress(workouts: Workout[], settings: Settings, now: Date = new Date(), extras: XpEvent[] = []): Progress {
   const done = workouts
     .filter((w): w is Workout & { finishedAt: string } => !!w.finishedAt)
     .sort((a, b) => a.finishedAt.localeCompare(b.finishedAt));
@@ -232,10 +256,22 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
   };
   let rirRun = 0;
 
+  const events = [...extras].sort((a, b) => a.at - b.at);
+  let ev = 0;
+  let bonusXp = 0;
+  const consumeUntil = (t: number) => {
+    while (ev < events.length && events[ev].at <= t) {
+      totalXp += events[ev].xp;
+      bonusXp += events[ev].xp;
+      ev++;
+    }
+  };
+
   for (const w of done) {
     const date = new Date(w.finishedAt);
     const wk = weekKey(date);
     advanceTo(wk);
+    consumeUntil(date.getTime());
 
     const multiplier = streakMultiplier(streak);
     const levelBefore = levelInfo(totalXp).level;
@@ -356,6 +392,8 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     results[w.id] = result;
   }
 
+  consumeUntil(Infinity);
+
   // Situação da semana atual
   const currentWeek = weekKey(now);
   advanceTo(currentWeek);
@@ -363,6 +401,7 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
 
   return {
     totalXp,
+    bonusXp,
     level: levelInfo(totalXp),
     attrXp,
     attrLevels: Object.fromEntries(ATTRIBUTES.map((a) => [a, levelInfo(attrXp[a], 0.5)])) as Record<Attribute, LevelInfo>,

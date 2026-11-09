@@ -31,11 +31,17 @@ export default function Character({
   playerLevel,
   look,
   scale = 9,
+  capa,
+  pet,
 }: {
   levels: Record<Attribute, number>;
   playerLevel: number;
   look: Look;
   scale?: number;
+  /** Capa cosmética da loja (substitui a de material). */
+  capa?: string;
+  /** Bichinho da loja, ao lado do personagem. */
+  pet?: string;
 }) {
   // Mantém o tamanho na tela do desenho antigo (24 unidades de largura), em pixels inteiros.
   const px = Math.max(1, Math.round((24 * scale) / W));
@@ -45,7 +51,7 @@ export default function Character({
     return mat ? `${piece}_${mat}` : null;
   };
   const layers = [
-    gear('capa', levels.folego),
+    capa ? `capa_${capa}` : gear('capa', levels.folego),
     `corpo_${look}`,
     gear('grevas', levels.pernas),
     gear('peitoral', levels.core),
@@ -76,6 +82,17 @@ export default function Character({
           <img key={name} src={sprite(name)} alt="" width={W * px} height={H * px} draggable={false} />
         ))}
       </div>
+      {pet && (
+        <img
+          className="pet"
+          src={sprite(`pet_${pet}`)}
+          alt=""
+          width={16 * px}
+          height={14 * px}
+          style={{ width: 16 * px, height: 14 * px, right: -12 * px, bottom: 0 }}
+          draggable={false}
+        />
+      )}
     </div>
   );
 }

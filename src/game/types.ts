@@ -48,3 +48,16 @@ export interface Settings {
   weeklyGoal: number; // 2 a 6
   unit: 'kg' | 'lb';
 }
+
+/** Ficha de treino: uma lista de exercícios para não ter que escolher um por um. */
+export interface Template {
+  id: string;
+  name: string;
+  exercises: string[];
+}
+
+/** Registro de peso corporal. */
+export interface BodyWeight {
+  day: string; // AAAA-MM-DD
+  kg: number;
+}
