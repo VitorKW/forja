@@ -5,7 +5,7 @@
  * - Desafio da semana: um duelo amigável que muda toda semana.
  */
 import { EXERCISE_BY_ID } from './exercises';
-import { dayKey, nextWeek, weekKey } from './rules';
+import { countsAsWorkout, nextWeek, weekKey, weekStatus } from './rules';
 import type { Workout } from './types';
 
 export interface DuoPlayer {
@@ -109,7 +109,7 @@ export interface JointPair {
 /** Pareia os treinos dos dois (cada treino entra em no máximo um par). */
 export function jointWorkouts(a: Workout[], b: Workout[]): JointPair[] {
   const done = (ws: Workout[]) =>
-    ws.filter((w) => w.finishedAt).sort((x, y) => x.startedAt.localeCompare(y.startedAt));
+    ws.filter((w) => w.finishedAt && countsAsWorkout(w)).sort((x, y) => x.startedAt.localeCompare(y.startedAt));
   const bs = done(b);
   const used = new Set<string>();
   const out: JointPair[] = [];
@@ -149,11 +149,9 @@ export function computeDuo(a: DuoPlayer, b: DuoPlayer, now: Date = new Date()): 
     }
     return m;
   });
-  const goalMet = (i: number, k: string) => {
-    const ws = byWeek[i].get(k) ?? [];
-    const days = new Set(ws.map((w) => dayKey(new Date(w.finishedAt!))));
-    return ws.some((w) => w.deload) || days.size >= players[i].weeklyGoal;
-  };
+  // Mesma regra de meta do perfil (treino mínimo, deload só a cada 4 semanas).
+  const status = players.map((p) => weekStatus(p.workouts, p.weeklyGoal));
+  const goalMet = (i: number, k: string) => status[i].complete(k);
   const damage = (i: number, k: string) => (byWeek[i].get(k) ?? []).reduce((sum, w) => sum + players[i].xpOf(w.id), 0);
 
   const current = weekKey(now);

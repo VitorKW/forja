@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { computeDuo, JOINT, jointWorkouts, type DuoState, type JointPair } from './game/duo';
-import { defaultGoals, dietHabits, mergeHabits, type DietGoals } from './game/diet';
+import { dietHabits, goalsOn, mergeHabits, type DietGoals } from './game/diet';
+import { dayKey } from './game/rules';
 import { activeMissions, cheerEvents, fullHabitDays, habitEvents, type HabitLog, type XpEvent } from './game/extras';
 import { computeProgress, type Progress } from './game/rules';
 import { computeSeasons, type SeasonState } from './game/season';
@@ -8,8 +9,9 @@ import { computeBets } from './game/bets';
 import { coinsEarned, coinsSpent } from './game/shop';
 import { useStore, type Profile } from './store';
 
+/** Metas de hoje. */
 export function goalsOf(p: Profile): DietGoals {
-  return p.dietGoals ?? defaultGoals(p.bodyWeights?.at(-1)?.kg);
+  return goalsOn(dayKey(new Date()), p);
 }
 
 /** Missões do perfil: as marcadas à mão mais as cumpridas pela dieta. */
@@ -17,7 +19,7 @@ export function habitsOf(p: Profile): HabitLog {
   // A dieta só marca proteína e água se elas estiverem entre as missões escolhidas.
   const ids = new Set(activeMissions(p.missions).map((m) => m.id));
   const diet = Object.fromEntries(
-    Object.entries(dietHabits(p.dietLog ?? {}, goalsOf(p)))
+    Object.entries(dietHabits(p.dietLog ?? {}, (day) => goalsOn(day, p)))
       .map(([d, hs]) => [d, hs.filter((h) => ids.has(h))] as const)
       .filter(([, hs]) => hs.length),
   );

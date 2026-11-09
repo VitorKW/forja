@@ -7,6 +7,7 @@
  */
 import type { HabitLog, XpEvent } from './extras';
 import type { Workout } from './types';
+import { countsAsWorkout } from './rules';
 
 export const BET_METRICS = [
   { id: 'treinos', label: 'Quem treina mais vezes', unit: 'treinos' },
@@ -79,7 +80,7 @@ export function betValue(metric: BetMetric, p: Pick<BetPlayer, 'workouts' | 'tim
   const inside = (ms: number) => ms >= start && ms < end;
   switch (metric) {
     case 'treinos':
-      return p.workouts.filter((w) => w.finishedAt && inside(new Date(w.finishedAt).getTime())).length;
+      return p.workouts.filter((w) => w.finishedAt && countsAsWorkout(w) && inside(new Date(w.finishedAt).getTime())).length;
     case 'xp':
       return p.timeline.filter((e) => inside(e.at)).reduce((s, e) => s + e.xp, 0);
     case 'missoes':

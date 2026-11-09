@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import Character from '../components/Character';
 import { XpBar, fmt } from '../components/ui';
-import { dayKey, levelTitle, RULES } from '../game/rules';
+import { countsAsWorkout, dayKey, levelTitle, RULES } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Attribute } from '../game/types';
 import { heatColor } from '../heat';
 import { useStore } from '../store';
@@ -73,7 +73,8 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
 
   // Os 7 dias reais da semana atual e se houve treino em cada um.
   const [y, m, d] = p.week.key.split('-').map(Number);
-  const trained = new Set(workouts.filter((w) => w.finishedAt).map((w) => dayKey(new Date(w.finishedAt!))));
+  // Mesma regra da meta: só treino que conta (3 séries ou 10 min de cardio) marca o dia.
+  const trained = new Set(workouts.filter((w) => w.finishedAt && countsAsWorkout(w)).map((w) => dayKey(new Date(w.finishedAt!))));
   const today = dayKey(new Date());
   const habitsToday = habits[me][today] ?? [];
   const manualToday = profile.habits?.[today] ?? [];

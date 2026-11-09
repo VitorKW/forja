@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { bossAt, bossSpriteName, campaignAt } from './campaign';
 import {
@@ -8,8 +8,10 @@ import {
   isSuspiciousWeight,
   levelInfo,
   nextWeek,
+  plausibleKm,
   streakMultiplier,
   weekKey,
+  weekStatus,
   xpToNext,
 } from './rules';
 import type { SetEntry, Settings, Workout } from './types';
@@ -20,6 +22,9 @@ let seq = 0;
 function set(exerciseId: string, weight: number, reps: number, rir: number | null = 2, warmup = false): SetEntry {
   return { id: `s${seq++}`, exerciseId, weight, reps, rir, warmup };
 }
+
+/** Três séries iguais: o mínimo para contar como treino. */
+const trio = (id: string, weight = 10) => [1, 2, 3].map(() => set(id, weight, 10, null));
 
 function workout(date: string, sets: SetEntry[], deload = false): Workout {
   return { id: `w${seq++}`, startedAt: date, finishedAt: date, deload, sets };
@@ -73,10 +78,32 @@ describe('semanas', () => {
 
 describe('XP de um treino', () => {
   it('série efetiva com RIR vale 13, aquecimento vale 2, mais o bônus do treino', () => {
+    const w = workout('2026-11-09T10:00:00', [set('supino', 40, 10, null, true), ...[1, 2, 3].map(() => set('supino', 60, 8, 2))]);
+    const p = computeProgress([w], settings, NOW);
+    expect(p.results[w.id].attrXp.empurrar).toBe(2 + 3 * 13);
+    expect(p.totalXp).toBe(2 + 3 * 13 + 30);
+  });
+
+  it('treino curto (menos de 3 séries) vale as séries, mas não o bônus nem o dia', () => {
     const w = workout('2026-11-09T10:00:00', [set('supino', 60, 8, 2), set('supino', 40, 10, null, true)]);
     const p = computeProgress([w], settings, NOW);
-    expect(p.results[w.id].attrXp.empurrar).toBe(15);
-    expect(p.totalXp).toBe(15 + 30);
+    expect(p.totalXp).toBe(15);
+    expect(p.week.days).toBe(0);
+    expect(p.workoutsDone).toBe(0);
+    const cardio = workout('2026-11-09T10:00:00', [set('caminhada', 0, 10, null)]);
+    expect(computeProgress([cardio], settings, NOW).workoutsDone).toBe(1);
+  });
+
+  it('série sem repetição não vale XP', () => {
+    const w = workout('2026-11-09T10:00:00', [set('supino', 60, 0, 2)]);
+    expect(computeProgress([w], settings, NOW).totalXp).toBe(0);
+  });
+
+  it('distância acima do possível para o tempo não conta', () => {
+    expect(plausibleKm('caminhada', 60, 4)).toBe(4);
+    expect(plausibleKm('caminhada', 1, 50)).toBe(0.13); // 8 km/h por 1 minuto
+    expect(cardioXp('caminhada', 1, 50)).toBeCloseTo(1 + 0.13 * 3);
+    expect(plausibleKm('escada', 30, 5)).toBe(0);
   });
 
   it('série com RIR > 3 vale como série fraca', () => {
@@ -127,15 +154,15 @@ describe('fadiga', () => {
 describe('meta semanal e constância', () => {
   it('dá bônus ao cumprir a meta e aumenta o multiplicador na semana seguinte', () => {
     const ws = [
-      workout('2026-11-02T10:00:00', [set('rosca', 10, 10, null)]),
-      workout('2026-11-04T10:00:00', [set('rosca', 10, 10, null)]),
-      workout('2026-11-06T10:00:00', [set('rosca', 10, 10, null)]),
-      workout('2026-11-09T10:00:00', [set('rosca', 10, 10, null)]),
+      workout('2026-11-02T10:00:00', trio('rosca')),
+      workout('2026-11-04T10:00:00', trio('rosca')),
+      workout('2026-11-06T10:00:00', trio('rosca')),
+      workout('2026-11-09T10:00:00', trio('rosca')),
     ];
     const p = computeProgress(ws, settings, NOW);
     expect(p.results[ws[2].id].bonuses.map((b) => b.xp)).toContain(75);
     expect(p.results[ws[3].id].multiplier).toBeCloseTo(1.1);
-    expect(p.results[ws[3].id].attrXp.puxar).toBe(11);
+    expect(p.results[ws[3].id].attrXp.puxar).toBe(33);
     expect(p.streak).toBe(1);
   });
 
@@ -156,11 +183,20 @@ describe('meta semanal e constância', () => {
     expect(p.streak).toBe(0); // 2 → 1 → 0 → 0
   });
 
-  it('semana de deload conta como cumprida', () => {
-    const w = workout('2026-11-02T10:00:00', [set('rosca', 5, 10)], true);
-    const p = computeProgress([w], settings, NOW);
+  it('semana de deload conta como cumprida com metade dos dias da meta', () => {
+    const one = workout('2026-11-02T10:00:00', trio('rosca', 5), true);
+    expect(computeProgress([one], settings, NOW).streak).toBe(0); // meta 3 → deload pede 2 dias
+    const two = [one, workout('2026-11-04T10:00:00', trio('rosca', 5), true)];
+    const p = computeProgress(two, settings, NOW);
     expect(p.streak).toBe(1);
     expect(p.achievements['sabe-descansar']).toBeDefined();
+  });
+
+  it('deload só vale uma vez a cada 4 semanas', () => {
+    const dl = (d: string) => workout(`${d}T10:00:00`, trio('rosca', 5), true);
+    const ws = ['2026-10-05', '2026-10-07', '2026-10-12', '2026-10-14', '2026-11-02', '2026-11-04'].map(dl);
+    const st = weekStatus(ws, 3);
+    expect([...st.deloadOk]).toEqual(['2026-10-05', '2026-11-02']);
   });
 });
 
@@ -224,7 +260,7 @@ describe('campanha de chefes', () => {
 
 describe('conquistas e validações', () => {
   it('desbloqueia Primeira Faísca no primeiro treino', () => {
-    const w = workout('2026-11-09T10:00:00', [set('rosca', 10, 10)]);
+    const w = workout('2026-11-09T10:00:00', trio('rosca'));
     expect(computeProgress([w], settings, NOW).results[w.id].achievements).toContain('primeira-faisca');
   });
 

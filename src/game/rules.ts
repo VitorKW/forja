@@ -80,12 +80,85 @@ export function isSuspiciousWeight(workouts: Workout[], exerciseId: string, weig
   return max > 0 && weight > max * RULES.suspiciousWeightFactor;
 }
 
+/**
+ * Distância que conta: no máximo o que dá para fazer no tempo registrado
+ * (ex.: caminhada até 8 km/h). Evita "1 minuto, 50 km".
+ */
+export function plausibleKm(exerciseId: string, minutes: number, distance = 0): number {
+  const ex = EXERCISE_BY_ID[exerciseId];
+  if (!ex || ex.kind !== 'cardio' || !ex.perKm) return 0;
+  const mins = Math.max(0, Math.min(RULES.maxCardioMinutes, minutes));
+  const max = ex.maxKmh ? (mins / 60) * ex.maxKmh : Infinity;
+  return Math.round(Math.min(Math.max(0, distance), max) * 100) / 100;
+}
+
 /** XP bruto de uma sessão de cardio (antes de multiplicador). */
 export function cardioXp(exerciseId: string, minutes: number, distance = 0): number {
   const ex = EXERCISE_BY_ID[exerciseId];
   if (!ex || ex.kind !== 'cardio') return 0;
   const mins = Math.max(0, Math.min(RULES.maxCardioMinutes, minutes));
-  return mins * (ex.perMinute ?? 1) + Math.max(0, distance) * (ex.perKm ?? 0);
+  return mins * (ex.perMinute ?? 1) + plausibleKm(exerciseId, minutes, distance) * (ex.perKm ?? 0);
+}
+
+// ---------- O que conta como treino ----------
+
+/** Mínimo para um registro contar como treino (bônus, dia na meta, treino junto). */
+export const MIN_WORKOUT = { sets: 3, cardioMin: 10 } as const;
+
+/** 3 séries de trabalho ou 10 minutos de cardio. Abrir e fechar o treino com 1 série não conta. */
+export function countsAsWorkout(w: Pick<Workout, 'sets'>): boolean {
+  let sets = 0;
+  let mins = 0;
+  for (const s of w.sets) {
+    const ex = EXERCISE_BY_ID[s.exerciseId];
+    if (!ex) continue;
+    if (ex.kind === 'cardio') mins += Math.max(0, Math.min(RULES.maxCardioMinutes, s.reps));
+    else if (!s.warmup && s.reps >= 1) sets++;
+  }
+  return sets >= MIN_WORKOUT.sets || mins >= MIN_WORKOUT.cardioMin;
+}
+
+/** Semana de deload: só uma a cada 4 semanas, e com pelo menos metade dos dias da meta. */
+export const DELOAD = { everyWeeks: 4 } as const;
+export const deloadDays = (weeklyGoal: number) => Math.max(1, Math.ceil(weeklyGoal / 2));
+
+function weeksBetween(a: string, b: string): number {
+  const [y1, m1, d1] = a.split('-').map(Number);
+  const [y2, m2, d2] = b.split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / (7 * 86400000));
+}
+
+export interface WeekStatus {
+  /** Dias com treino que conta, por semana. */
+  days: Map<string, Set<string>>;
+  /** Semanas em que o deload vale como meta cumprida. */
+  deloadOk: Set<string>;
+  complete: (week: string) => boolean;
+}
+
+/** Quais semanas cumpriram a meta (mesma regra para o perfil e para a dupla). */
+export function weekStatus(workouts: Workout[], weeklyGoal: number): WeekStatus {
+  const days = new Map<string, Set<string>>();
+  const deloadWeeks = new Set<string>();
+  for (const w of workouts) {
+    if (!w.finishedAt || !countsAsWorkout(w)) continue;
+    const d = new Date(w.finishedAt);
+    const k = weekKey(d);
+    const set = days.get(k) ?? new Set<string>();
+    set.add(dayKey(d));
+    days.set(k, set);
+    if (w.deload) deloadWeeks.add(k);
+  }
+  const deloadOk = new Set<string>();
+  let last: string | null = null;
+  for (const k of [...deloadWeeks].sort()) {
+    if ((days.get(k)?.size ?? 0) < deloadDays(weeklyGoal)) continue;
+    if (last && weeksBetween(last, k) < DELOAD.everyWeeks) continue;
+    deloadOk.add(k);
+    last = k;
+  }
+  const complete = (k: string) => (days.get(k)?.size ?? 0) >= weeklyGoal || deloadOk.has(k);
+  return { days, deloadOk, complete };
 }
 
 /**
@@ -201,19 +274,8 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     .sort((a, b) => a.finishedAt.localeCompare(b.finishedAt));
 
   // Pré-calcula quais semanas foram cumpridas (para semanas já encerradas).
-  const weekInfo = new Map<string, { days: Set<string>; deload: boolean }>();
-  for (const w of done) {
-    const d = new Date(w.finishedAt);
-    const k = weekKey(d);
-    const info = weekInfo.get(k) ?? { days: new Set(), deload: false };
-    info.days.add(dayKey(d));
-    info.deload ||= w.deload;
-    weekInfo.set(k, info);
-  }
-  const weekComplete = (k: string) => {
-    const i = weekInfo.get(k);
-    return !!i && (i.deload || i.days.size >= settings.weeklyGoal);
-  };
+  const weeks = weekStatus(done, settings.weeklyGoal);
+  const weekComplete = weeks.complete;
 
   let streak = 0; // constância (cai pela metade ao falhar)
   let run = 0; // semanas seguidas cumpridas (zera ao falhar)
@@ -299,7 +361,9 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
       let xp: number;
       if (ex.kind === 'cardio') {
         xp = cardioXp(ex.id, s.reps, s.distance ?? 0);
-        result.distance += Math.max(0, s.distance ?? 0);
+        result.distance += plausibleKm(ex.id, s.reps, s.distance ?? 0);
+      } else if (s.reps < 1) {
+        return; // série sem repetição não vale nada
       } else {
         const effective = !s.warmup && (s.rir === null || s.rir <= 3);
         xp = effective ? XP.effectiveSet : XP.weakSet;
@@ -352,19 +416,24 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
       }
     });
 
-    result.bonuses.unshift({ label: 'Treino concluído', xp: XP.workoutBonus });
+    // Treino curto demais (menos de 3 séries ou 10 min de cardio): as séries valem XP,
+    // mas não dá bônus de treino nem conta dia na meta.
+    const valid = countsAsWorkout(w);
+    if (valid) result.bonuses.unshift({ label: 'Treino concluído', xp: XP.workoutBonus });
 
     // Meta semanal
     const days = weekDaysSoFar.get(wk) ?? new Set<string>();
-    days.add(dayKey(date));
+    if (valid) days.add(dayKey(date));
     weekDaysSoFar.set(wk, days);
-    if (!weeksAwarded.has(wk) && (w.deload || days.size >= settings.weeklyGoal)) {
+    const goalHit = days.size >= settings.weeklyGoal;
+    const deloadHit = weeks.deloadOk.has(wk) && days.size >= deloadDays(settings.weeklyGoal);
+    if (!weeksAwarded.has(wk) && (goalHit || deloadHit)) {
       weeksAwarded.add(wk);
       stats.weeksCompleted++;
       stats.bestWeekRun = Math.max(stats.bestWeekRun, run + 1);
-      result.bonuses.push({ label: w.deload ? 'Semana de deload cumprida' : 'Meta semanal cumprida', xp: XP.weeklyGoalBonus });
+      result.bonuses.push({ label: goalHit ? 'Meta semanal cumprida' : 'Semana de deload cumprida', xp: XP.weeklyGoalBonus });
     }
-    if (w.deload) stats.deloadsDone++;
+    if (w.deload && valid) stats.deloadsDone++;
 
     // Soma tudo
     for (const a of ATTRIBUTES) {
@@ -379,7 +448,7 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     stats.distanceTotal += result.distance;
 
     // Conquistas
-    stats.workoutsDone++;
+    if (valid) stats.workoutsDone++;
     stats.bossesDefeated = result.campaignAfter.defeated;
     for (const a of ATTRIBUTES) stats.attrLevels[a] = levelInfo(attrXp[a], 0.5).level;
     for (const ach of ACHIEVEMENTS) {
@@ -397,7 +466,7 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
   // Situação da semana atual
   const currentWeek = weekKey(now);
   advanceTo(currentWeek);
-  const daysThisWeek = weekInfo.get(currentWeek)?.days.size ?? 0;
+  const daysThisWeek = weeks.days.get(currentWeek)?.size ?? 0;
 
   return {
     totalXp,
@@ -411,7 +480,7 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     streak,
     multiplier: streakMultiplier(streak),
     week: { key: currentWeek, days: daysThisWeek, goal: settings.weeklyGoal, done: weekComplete(currentWeek) },
-    workoutsDone: done.length,
+    workoutsDone: stats.workoutsDone,
     achievements,
     results,
     weekSets: weekSetCount.get(currentWeek) ?? zeroAttrs(),

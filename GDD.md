@@ -39,7 +39,7 @@ Treinar → registrar séries → ganhar XP nos atributos → subir de nível / 
 | **Constância** | Multiplicador de XP: +10% por semana cumprida em sequência, até +50%. Se perder uma semana, o bônus cai pela metade (não zera) | 2 |
 | **Chefes** | Cada levantamento principal tem um chefe. A "vida" dele é o seu 1RM estimado × 1,025. Derrota o chefe quem supera essa marca; aí ele volta mais forte | 1, 3 |
 | **Fadiga** | Acima de 20 séries semanais em um mesmo atributo, o XP dele cai para 50%. O jogo avisa: "seu Empurrar está sobrecarregado" | 2, 3 |
-| **Deload** | Uma semana marcada como deload conta como meta cumprida, mesmo com menos volume | 2, 3 |
+| **Deload** | Uma semana de deload cumpre a meta com metade dos dias (arredondado para cima), uma vez a cada 4 semanas | 2, 3 |
 
 ## 4. Progressão e economia
 

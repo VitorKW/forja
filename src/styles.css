@@ -590,3 +590,13 @@ p { margin: 6px 0; }
 .jb-bar span { display: block; height: 100%; border-radius: 4px; background: var(--faint); transition: width 0.4s; }
 .jb-cell.lead .jb-bar span { background: var(--rest); }
 .jb-now { font-size: 0.85rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Dieta: calorias como alvo, porções e calculadora */
+.meter.over .meter-label::after { content: ' ↑'; color: var(--ember); }
+.meter.over .meter-fill { background: var(--ember); }
+.meter-note { margin: 4px 0 0; }
+.food-portion { font-size: 0.68rem; color: var(--faint); line-height: 1.1; text-align: center; }
+.kcal-calc { margin-top: 6px; }
+.kcal-calc .seg { margin: 8px 0; width: fit-content; }
+.kcal-calc select { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; max-width: 60%; }
+.kcal-calc .ghost { width: 100%; margin-top: 8px; }
+.seg button.on { background: var(--surface-hi); color: var(--text); }

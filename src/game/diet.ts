@@ -3,6 +3,7 @@
  * Quando a meta de proteína ou de água é batida, a missão do dia é marcada sozinha.
  */
 import type { HabitId, HabitLog } from './extras';
+import type { BodyWeight } from './types';
 
 export interface DietEntry {
   id: string;
@@ -29,15 +30,19 @@ export interface DietTotals {
   agua: number;
 }
 
+/**
+ * Porções comuns, com valores aproximados da Tabela Brasileira de Composição de
+ * Alimentos (TACO) para o alimento pronto. Servem para registrar rápido, não para pesar.
+ */
 export const QUICK_FOODS = [
-  { id: 'ovo', label: 'Ovo', icon: '🥚', proteina: 6, kcal: 75 },
-  { id: 'frango', label: 'Frango', portion: '100 g', icon: '🍗', proteina: 31, kcal: 165 },
-  { id: 'carne', label: 'Carne', portion: '100 g', icon: '🥩', proteina: 26, kcal: 220 },
-  { id: 'whey', label: 'Whey', icon: '🥤', proteina: 24, kcal: 120 },
-  { id: 'iogurte', label: 'Iogurte', icon: '🥛', proteina: 10, kcal: 110 },
-  { id: 'prato', label: 'Arroz e feijão', icon: '🍛', proteina: 9, kcal: 350 },
-  { id: 'pao', label: 'Pão', icon: '🥖', proteina: 4, kcal: 150 },
-  { id: 'fruta', label: 'Fruta', icon: '🍌', proteina: 1, kcal: 90 },
+  { id: 'ovo', label: 'Ovo', portion: '1 unidade', icon: '🥚', proteina: 6, kcal: 75 },
+  { id: 'frango', label: 'Frango', portion: '100 g grelhado', icon: '🍗', proteina: 32, kcal: 160 },
+  { id: 'carne', label: 'Carne', portion: '100 g cozida', icon: '🥩', proteina: 30, kcal: 230 },
+  { id: 'whey', label: 'Whey', portion: '1 dose de 30 g', icon: '🥤', proteina: 24, kcal: 120 },
+  { id: 'iogurte', label: 'Iogurte', portion: '1 pote de 170 g', icon: '🥛', proteina: 7, kcal: 100 },
+  { id: 'prato', label: 'Arroz e feijão', portion: '1 prato', icon: '🍛', proteina: 10, kcal: 300 },
+  { id: 'pao', label: 'Pão francês', portion: '1 unidade', icon: '🥖', proteina: 4, kcal: 150 },
+  { id: 'fruta', label: 'Fruta', portion: '1 banana ou maçã', icon: '🍌', proteina: 1, kcal: 80 },
 ] as const;
 
 export const WATER_STEPS = [
@@ -48,6 +53,56 @@ export const WATER_STEPS = [
 /** Proteína: 1,8 g por kg de peso corporal (meio da faixa 1,6–2,2 g/kg), arredondada de 5 em 5. */
 export function proteinFor(weightKg: number): number {
   return Math.round((weightKg * 1.8) / 5) * 5;
+}
+
+/** Água: 35 ml por kg, arredondado de 250 em 250 (copos), entre 1,5 e 4 litros. */
+export function waterFor(weightKg: number): number {
+  return Math.min(4000, Math.max(1500, Math.round((weightKg * 35) / 250) * 250));
+}
+
+export const ACTIVITY = [
+  { id: 'leve', label: 'Treino 1–2x por semana', factor: 1.375 },
+  { id: 'moderado', label: 'Treino 3–5x por semana', factor: 1.55 },
+  { id: 'alto', label: 'Treino 6–7x ou trabalho físico', factor: 1.725 },
+] as const;
+
+export const KCAL_GOALS = [
+  { id: 'perder', label: 'Perder gordura', factor: 0.8 },
+  { id: 'manter', label: 'Manter', factor: 1 },
+  { id: 'ganhar', label: 'Ganhar massa', factor: 1.1 },
+] as const;
+
+export interface KcalInput {
+  sex: 'm' | 'f';
+  age: number;
+  heightCm: number;
+  weightKg: number;
+  activity: (typeof ACTIVITY)[number]['id'];
+  goal: (typeof KCAL_GOALS)[number]['id'];
+}
+
+/** Metabolismo basal pela equação de Mifflin-St Jeor. */
+export function bmr({ sex, age, heightCm, weightKg }: Pick<KcalInput, 'sex' | 'age' | 'heightCm' | 'weightKg'>): number {
+  return 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'm' ? 5 : -161);
+}
+
+/**
+ * Meta de calorias: basal × atividade × objetivo (−20% para perder, +10% para ganhar),
+ * de 50 em 50 e nunca abaixo do basal.
+ */
+export function kcalFor(i: KcalInput): number {
+  const base = bmr(i);
+  const act = ACTIVITY.find((a) => a.id === i.activity)?.factor ?? 1.55;
+  const g = KCAL_GOALS.find((x) => x.id === i.goal)?.factor ?? 1;
+  return Math.round(Math.max(base, base * act * g) / 50) * 50;
+}
+
+/** Calorias são alvo, não "quanto mais melhor": 90–110% da meta está certo. */
+export function kcalStatus(value: number, goal: number): 'sem-meta' | 'abaixo' | 'ok' | 'acima' {
+  if (goal <= 0) return 'sem-meta';
+  if (value > goal * 1.1) return 'acima';
+  if (value >= goal * 0.9) return 'ok';
+  return 'abaixo';
 }
 
 export function defaultGoals(weightKg?: number): DietGoals {
@@ -64,10 +119,41 @@ export function totals(entries: DietEntry[] = []): DietTotals {
   return t;
 }
 
-/** Missões cumpridas pela dieta: proteína e água acima da meta. */
-export function dietHabits(log: DietLog, goals: DietGoals): HabitLog {
+/**
+ * Mudança de meta a partir de um dia. `goals: null` = metas padrão (pelo peso do dia).
+ * Guardar o histórico faz com que mudar a meta hoje não mude as missões de dias passados.
+ */
+export interface GoalChange {
+  from: string; // AAAA-MM-DD
+  goals: DietGoals | null;
+}
+
+/** Peso registrado no dia ou no último registro antes dele. */
+export function weightOn(weights: BodyWeight[] = [], day: string): number | undefined {
+  let kg: number | undefined;
+  for (const w of [...weights].sort((a, b) => a.day.localeCompare(b.day))) if (w.day <= day) kg = w.kg;
+  return kg;
+}
+
+/** Meta que valia em um dia. */
+export function goalsOn(day: string, p: { dietGoals?: DietGoals; dietGoalsLog?: GoalChange[]; bodyWeights?: BodyWeight[] }): DietGoals {
+  const log = p.dietGoalsLog ?? [];
+  let g: DietGoals | null | undefined = log.length ? undefined : p.dietGoals;
+  for (const c of [...log].sort((a, b) => a.from.localeCompare(b.from))) if (c.from <= day) g = c.goals;
+  return g ?? defaultGoals(weightOn(p.bodyWeights, day));
+}
+
+/** Novo histórico ao salvar metas hoje (guarda a meta antiga para os dias anteriores). */
+export function changeGoals(log: GoalChange[] = [], previous: DietGoals | undefined, today: string, goals: DietGoals): GoalChange[] {
+  const base = log.length ? log : [{ from: '0000-01-01', goals: previous ?? null }];
+  return [...base.filter((c) => c.from !== today), { from: today, goals }].sort((a, b) => a.from.localeCompare(b.from)).slice(-30);
+}
+
+/** Missões cumpridas pela dieta: proteína e água acima da meta daquele dia. */
+export function dietHabits(log: DietLog, goalsFor: DietGoals | ((day: string) => DietGoals)): HabitLog {
   const out: HabitLog = {};
   for (const [day, entries] of Object.entries(log)) {
+    const goals = typeof goalsFor === 'function' ? goalsFor(day) : goalsFor;
     const t = totals(entries);
     const ids: HabitId[] = [];
     if (goals.proteina > 0 && t.proteina >= goals.proteina) ids.push('proteina');

@@ -14,7 +14,7 @@ export interface XpEvent {
 /** Catálogo de missões. Cada pessoa escolhe de 3 a 5 (e pode criar as suas). */
 export const MISSION_CATALOG = [
   { id: 'proteina', label: 'Bati a proteína do dia', short: 'Proteína' },
-  { id: 'agua', label: 'Bebi 2 litros de água', short: 'Água' },
+  { id: 'agua', label: 'Bati a meta de água', short: 'Água' },
   { id: 'sono', label: 'Dormi 7 horas ou mais', short: 'Sono' },
   { id: 'passos', label: 'Andei 8 mil passos', short: 'Passos' },
   { id: 'alongar', label: 'Alonguei 10 minutos', short: 'Alongar' },

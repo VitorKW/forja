@@ -3,7 +3,7 @@ import Seal from '../components/Seal';
 import { fmt } from '../components/ui';
 import { ACHIEVEMENTS } from '../game/achievements';
 import { EXERCISE_BY_ID } from '../game/exercises';
-import { levelTitle } from '../game/rules';
+import { countsAsWorkout, levelTitle } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
 import { HEAT } from '../heat';
 import { useProfile, useStore } from '../store';
@@ -180,6 +180,15 @@ export default function Summary({ workoutId }: { workoutId: string }) {
                 ? `Você agora é ${levelTitle(r.levelAfter).toLowerCase()}.`
                 : 'Seu personagem ficou mais forte.'}
             </div>
+          </section>
+        )}
+
+        {!countsAsWorkout(workout) && (
+          <section className="panel warn">
+            <strong>Treino curto</strong>
+            <p className="muted small">
+              As séries valeram XP, mas o bônus de treino e o dia na meta da semana pedem 3 séries de trabalho ou 10 minutos de cardio.
+            </p>
           </section>
         )}
 

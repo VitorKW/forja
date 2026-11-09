@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { dayKey } from '../game/rules';
+import { countsAsWorkout, dayKey } from '../game/rules';
 import type { Workout } from '../game/types';
 
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const pad = (n: number) => String(n).padStart(2, '0');
 
 function trainedDays(ws: Workout[]): Set<string> {
-  return new Set(ws.filter((w) => w.finishedAt).map((w) => dayKey(new Date(w.startedAt))));
+  return new Set(ws.filter((w) => w.finishedAt && countsAsWorkout(w)).map((w) => dayKey(new Date(w.finishedAt!))));
 }
 
 /** O ano dos dois: uma linha por mês, um quadrado por dia, cor de quem treinou. */

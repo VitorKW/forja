@@ -19,6 +19,8 @@ export interface Exercise {
   perMinute?: number;
   /** Cardio: XP extra por km. Ausente = atividade sem distância. */
   perKm?: number;
+  /** Velocidade máxima plausível (km/h): distância acima disso não conta. */
+  maxKmh?: number;
 }
 
 /**

@@ -16,6 +16,7 @@ const set = (exerciseId: string, weight: number, reps: number, rir: number | nul
   warmup: false,
   ...extra,
 });
+const trio = () => [0, 1, 2].map(() => set('supino', 40, 10));
 const workout = (date: string, sets: SetEntry[], deload = false): Workout => ({ id: `w${seq++}`, startedAt: date, finishedAt: date, deload, sets });
 const player = (name: string, workouts: Workout[], xp = 100): DuoPlayer => ({ name, workouts, xpOf: () => xp, weeklyGoal: 3 });
 
@@ -54,8 +55,8 @@ describe('missões e incentivos', () => {
 
 describe('dupla', () => {
   it('chefe da semana soma o dano dos dois', () => {
-    const a = player('Vitor', [workout('2026-11-09T10:00:00', [])], 700);
-    const b = player('Emanuela', [workout('2026-11-10T10:00:00', [])], 600);
+    const a = player('Vitor', [workout('2026-11-09T10:00:00', trio())], 700);
+    const b = player('Emanuela', [workout('2026-11-10T10:00:00', trio())], 600);
     const d = computeDuo(a, b, NOW);
     expect(d.raid.hp).toBe(RAID.baseHp);
     expect(d.raid.damage).toEqual([700, 600]);
@@ -70,7 +71,7 @@ describe('dupla', () => {
   });
 
   it('conta semanas em que os dois cumpriram a meta', () => {
-    const days = (week: string[]) => week.map((d) => workout(`${d}T10:00:00`, []));
+    const days = (week: string[]) => week.map((d) => workout(`${d}T10:00:00`, trio()));
     const a = player('Vitor', days(['2026-10-26', '2026-10-27', '2026-10-28', '2026-11-02', '2026-11-03', '2026-11-04']));
     const b = player('Emanuela', days(['2026-10-26', '2026-10-28', '2026-10-30', '2026-11-02', '2026-11-04', '2026-11-06']));
     const d = computeDuo(a, b, NOW);

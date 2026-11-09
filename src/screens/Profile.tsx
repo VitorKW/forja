@@ -11,6 +11,7 @@ import { monthKey } from '../game/recap';
 import { TIER_NAME } from '../components/Character';
 import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
+import { countsAsWorkout } from '../game/rules';
 import type { Attribute } from '../game/types';
 import { PushPanel } from '../components/PushPanel';
 import BackupPanel from '../components/BackupPanel';
@@ -218,7 +219,7 @@ export default function Profile() {
               <button className="history-item" onClick={() => openSummary(w.id)}>
                 <span>{new Date(w.finishedAt!).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span>
                 <span className="muted small">
-                  {w.sets.length} séries{w.deload ? ', deload' : ''}
+                  {w.sets.length} séries{w.deload ? ', deload' : ''}{countsAsWorkout(w) ? '' : ', curto (não conta na meta)'}
                 </span>
               </button>
               <span className="xp-num">+{p.results[w.id]?.xpTotal ?? 0}</span>

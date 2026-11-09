@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { BodyWeight, SetEntry, Settings, Template, Workout } from './game/types';
 import type { Cheer, CheerKind, HabitId, HabitLog } from './game/extras';
 import type { ItemKind } from './game/shop';
-import { compactDiet, type DietEntry, type DietGoals, type DietLog } from './game/diet';
+import { changeGoals, compactDiet, type GoalChange, type DietEntry, type DietGoals, type DietLog } from './game/diet';
 import { dayKey } from './game/rules';
 import type { Bet, BetAnswer } from './game/bets';
 import type { MissionConfig } from './game/extras';
@@ -37,6 +37,8 @@ export interface Profile {
   bodyWeights?: BodyWeight[];
   dietLog?: DietLog;
   dietGoals?: DietGoals;
+  /** Quando cada meta passou a valer (mudar a meta não muda o passado). */
+  dietGoalsLog?: GoalChange[];
   /** Apostas propostas por este perfil. */
   bets?: Bet[];
   /** Respostas deste perfil às apostas do par. */
@@ -97,6 +99,8 @@ export interface RemoteMeta {
   bodyWeights?: BodyWeight[];
   dietLog?: DietLog;
   dietGoals?: DietGoals;
+  /** Quando cada meta passou a valer (mudar a meta não muda o passado). */
+  dietGoalsLog?: GoalChange[];
   bets?: Bet[];
   betAnswers?: Record<string, BetAnswer>;
   program?: ProgramConfig | null;
@@ -105,7 +109,7 @@ export interface RemoteMeta {
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'bets', 'betAnswers', 'program', 'missions', 'live'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -124,6 +128,7 @@ export function metaOf(p: Profile): RemoteMeta {
     program: p.program ?? null,
     live: p.live ?? null,
     ...(p.dietGoals ? { dietGoals: p.dietGoals } : {}),
+    ...(p.dietGoalsLog?.length ? { dietGoalsLog: p.dietGoalsLog } : {}),
     ...(p.missions ? { missions: p.missions } : {}),
   };
 }
@@ -193,7 +198,8 @@ interface State {
   buyItem: (id: string) => void;
   equip: (kind: ItemKind, id: string | null) => void;
   logWeight: (day: string, kg: number) => void;
-  addFood: (e: Omit<DietEntry, 'id' | 'at'>) => void;
+  /** day: AAAA-MM-DD (padrão: hoje), para registrar algo esquecido de ontem. */
+  addFood: (e: Omit<DietEntry, 'id' | 'at'>, day?: string) => void;
   removeFood: (day: string, id: string) => void;
   setDietGoals: (g: DietGoals) => void;
   proposeBet: (b: Omit<Bet, 'id' | 'createdAt'>) => Bet;
@@ -359,12 +365,15 @@ export const useStore = create<State>()(
             bodyWeights: [...(p.bodyWeights ?? []).filter((b) => b.day !== day), { day, kg }].sort((a, b) => a.day.localeCompare(b.day)),
             metaAt: Date.now(),
           })),
-        addFood: (e) =>
+        addFood: (e, day) =>
           update((p) => {
-            const day = dayKey(new Date());
+            const today = dayKey(new Date());
+            const d = day && day < today ? day : today;
+            const [y, m, dd] = d.split('-').map(Number);
+            const at = d === today ? new Date() : new Date(y, m - 1, dd, 20);
             const log = { ...(p.dietLog ?? {}) };
-            log[day] = [...(log[day] ?? []), { ...e, id: uid(), at: new Date().toISOString() }];
-            return { dietLog: compactDiet(log, day), metaAt: Date.now() };
+            log[d] = [...(log[d] ?? []), { ...e, id: uid(), at: at.toISOString() }];
+            return { dietLog: compactDiet(log, today), metaAt: Date.now() };
           }),
         removeFood: (day, id) =>
           update((p) => {
@@ -373,7 +382,8 @@ export const useStore = create<State>()(
             if (!log[day].length) delete log[day];
             return { dietLog: log, metaAt: Date.now() };
           }),
-        setDietGoals: (dietGoals) => update(() => ({ dietGoals, metaAt: Date.now() })),
+        setDietGoals: (dietGoals) =>
+          update((p) => ({ dietGoals, dietGoalsLog: changeGoals(p.dietGoalsLog, p.dietGoals, dayKey(new Date()), dietGoals), metaAt: Date.now() })),
         proposeBet: (b) => {
           const bet: Bet = { ...b, id: uid(), createdAt: new Date().toISOString() };
           update((p) => ({ bets: [...(p.bets ?? []), bet].slice(-40), metaAt: Date.now() }));

@@ -12,7 +12,7 @@ const set = (exerciseId: string, weight: number, reps: number, extra: Partial<Se
   warmup: false,
   ...extra,
 });
-const w = (id: string, start: string, end: string, sets: SetEntry[] = []): Workout => ({ id, startedAt: start, finishedAt: end, deload: false, sets });
+const w = (id: string, start: string, end: string, sets: SetEntry[] = [0, 1, 2].map(() => set('supino', 40, 10))): Workout => ({ id, startedAt: start, finishedAt: end, deload: false, sets });
 
 describe('treino junto', () => {
   it('números do treino: séries, volume, cardio e km', () => {

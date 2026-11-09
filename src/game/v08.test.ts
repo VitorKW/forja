@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { computeBets, type Bet, type BetPlayer } from './bets';
 import { reminderFor, type Status } from '../../push/src/reminder';
 import { parseBackup } from '../components/BackupPanel';
@@ -6,7 +6,7 @@ import type { Workout } from './types';
 
 const day = (d: number, h = 12) => new Date(2026, 10, d, h).getTime(); // novembro de 2026
 const iso = (ms: number) => new Date(ms).toISOString();
-const w = (id: string, ms: number): Workout => ({ id, startedAt: iso(ms - 3600000), finishedAt: iso(ms), deload: false, sets: [] });
+const w = (id: string, ms: number): Workout => ({ id, startedAt: iso(ms - 3600000), finishedAt: iso(ms), deload: false, sets: [0, 1, 2].map((i) => ({ id: `x${i}`, exerciseId: 'supino', weight: 40, reps: 10, rir: 2, warmup: false })) });
 const player = (extra: Partial<BetPlayer> = {}): BetPlayer => ({ bets: [], answers: {}, workouts: [], timeline: [], habits: {}, ...extra });
 const bet = (extra: Partial<Bet> = {}): Bet => ({ id: 'b1', metric: 'treinos', days: 7, stake: 50, createdAt: iso(day(2, 9)), ...extra });
 

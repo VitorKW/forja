@@ -7,7 +7,7 @@ import type { SetEntry, Workout } from './types';
 
 let seq = 0;
 const entry = (p: number, agua = 0, kcal = 0): DietEntry => ({ id: `d${seq++}`, at: '2026-11-09T12:00:00Z', label: 'x', proteina: p, kcal, agua });
-const w = (start: string, minutes = 60, sets: SetEntry[] = []): Workout => ({
+const w = (start: string, minutes = 60, sets: SetEntry[] = [0, 1, 2].map(() => s('supino', 40, 10))): Workout => ({
   id: `w${seq++}`,
   startedAt: new Date(start).toISOString(),
   finishedAt: new Date(new Date(start).getTime() + minutes * 60000).toISOString(),

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stepper, fmt } from '../components/ui';
 import RestTimer, { unlockSound, useRest } from '../components/RestTimer';
 import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
-import { cardioXp, computeProgress, estimate1RM, isSuspiciousWeight, recordTarget, suggestLoad } from '../game/rules';
+import { cardioXp, computeProgress, countsAsWorkout, estimate1RM, isSuspiciousWeight, recordTarget, suggestLoad } from '../game/rules';
 import { buildProgram, loadTarget, prescription } from '../game/program';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
 import { currentProfile, useProfile, useStore } from '../store';
@@ -165,6 +165,7 @@ export default function WorkoutScreen() {
       if (confirm('Nenhuma série registrada. Sair do treino?')) discardWorkout();
       return;
     }
+    if (!countsAsWorkout(active) && !confirm('Treino curto: as séries valem XP, mas para ganhar o bônus de treino e contar o dia na meta são 3 séries de trabalho ou 10 minutos de cardio. Terminar mesmo assim?')) return;
     const s = useStore.getState();
     const name = currentProfile(s).name;
     const series = active.sets.filter((x) => !x.warmup).length;
@@ -347,7 +348,7 @@ export default function WorkoutScreen() {
         <label className="toggle panel compact">
           <input type="checkbox" checked={active.deload} onChange={(e) => setDeload(e.target.checked)} />
           <span>
-            Treino de deload <span className="muted small">(conta como semana cumprida)</span>
+            Treino de deload <span className="muted small">(semana leve: metade dos dias da meta já cumpre, uma vez a cada 4 semanas)</span>
           </span>
         </label>
 
