@@ -186,7 +186,7 @@ export function demoProfiles(): Profile[] {
       betAnswers: answersB,
       // Treinando agora, para mostrar o card ao vivo.
       live: lastA
-        ? { id: 'demo-live', startedAt: new Date(Date.now() - 25 * 60000).toISOString(), sets: 9, session: 'Full body B', last: { exerciseId: 'stiff', weight: 35, reps: 12, at: new Date().toISOString() } }
+        ? { id: 'demo-live', startedAt: new Date(Date.now() - 25 * 60000).toISOString(), sets: 9, strengthSets: 8, volume: 2740, km: 0, cardioMin: 0, session: 'Full body B', last: { exerciseId: 'stiff', weight: 35, reps: 12, at: new Date().toISOString() } }
         : null,
     },
   ];

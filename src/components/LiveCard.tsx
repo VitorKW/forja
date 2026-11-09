@@ -4,6 +4,8 @@ import CheerButtons from './CheerButtons';
 import { fmt } from './ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import { useGame } from '../useProgress';
+import { useStore } from '../store';
+import { notifyStart } from '../push';
 
 /** Treino que tem menos de 4 horas ainda conta como "agora". */
 const LIVE_MS = 4 * 3600000;
@@ -11,6 +13,7 @@ const LIVE_MS = 4 * 3600000;
 /** O par está treinando agora: séries, último exercício e incentivo na hora. */
 export default function LiveCard() {
   const { profiles, partner } = useGame();
+  const startWorkout = useStore((s) => s.startWorkout);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -18,7 +21,7 @@ export default function LiveCard() {
   }, []);
   const other = profiles[partner];
   const live = other?.live;
-  if (!live || now - new Date(live.startedAt).getTime() > LIVE_MS) return null;
+  if (!live || live.finishedAt || now - new Date(live.startedAt).getTime() > LIVE_MS) return null;
   const mins = Math.max(1, Math.round((now - new Date(live.startedAt).getTime()) / 60000));
   const last = live.last && EXERCISE_BY_ID[live.last.exerciseId];
 
@@ -40,6 +43,16 @@ export default function LiveCard() {
           : ''}
       </p>
       <CheerButtons toProfileId={other.id} workoutId={live.id} />
+      <button
+        className="primary"
+        onClick={() => {
+          startWorkout();
+          notifyStart('treino junto');
+        }}
+      >
+        Treinar junto
+      </button>
+      <p className="muted small">Abre seu treino com o placar dos dois lado a lado: tempo, séries, volume e km.</p>
     </motion.section>
   );
 }

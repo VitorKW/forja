@@ -9,7 +9,11 @@ import { HEAT } from '../heat';
 import { useProfile, useStore } from '../store';
 import BossSprite from '../components/BossSprite';
 import type { CampaignState } from '../game/campaign';
-import { useProgress } from '../useProgress';
+import { useGame, useProgress } from '../useProgress';
+import JointBoard from '../components/JointBoard';
+import { durationSec, partnerWorkoutOf, startedTogether, workoutStats } from '../game/joint';
+import { JOINT } from '../game/duo';
+import type { Workout } from '../game/types';
 
 function useCountUp(target: number, ms = 1100) {
   const [v, setV] = useState(0);
@@ -91,6 +95,42 @@ function BossHit({ before, after, damage }: { before: CampaignState; after: Camp
   );
 }
 
+/** Treino junto: compara com o treino do par (terminado ou ainda em andamento). */
+function JointSummary({ workout }: { workout: Workout }) {
+  const g = useGame();
+  const [now, setNow] = useState(Date.now());
+  const other = g.profiles[g.partner];
+  const otherDone = other ? partnerWorkoutOf(workout.id, g.me, g.joint, other.workouts) : undefined;
+  const live = other?.live;
+  const otherLive = !otherDone && live && !live.finishedAt && startedTogether(live.startedAt, workout.startedAt) ? live : undefined;
+  useEffect(() => {
+    if (!otherLive) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [otherLive]);
+  if (!other || (!otherDone && !otherLive)) return null;
+  const me = { name: g.profile.name, sec: durationSec(workout.startedAt, workout.finishedAt), stats: workoutStats(workout.sets), done: true };
+  return otherDone ? (
+    <JointBoard
+      title="Treino junto"
+      note={`+${JOINT.xp} XP e ${JOINT.coins} moedas`}
+      me={me}
+      other={{ name: other.name, sec: durationSec(otherDone.startedAt, otherDone.finishedAt), stats: workoutStats(otherDone.sets), done: true }}
+    />
+  ) : (
+    <JointBoard
+      title="Treino junto"
+      note={`${other.name} ainda está treinando`}
+      me={me}
+      other={{
+        name: other.name,
+        sec: durationSec(otherLive!.startedAt, null, now),
+        stats: { sets: otherLive!.strengthSets ?? otherLive!.sets, volume: otherLive!.volume ?? 0, km: otherLive!.km ?? 0, cardioMin: otherLive!.cardioMin ?? 0 },
+      }}
+    />
+  );
+}
+
 export default function Summary({ workoutId }: { workoutId: string }) {
   const p = useProgress();
   const close = useStore((s) => s.closeSummary);
@@ -142,6 +182,8 @@ export default function Summary({ workoutId }: { workoutId: string }) {
             </div>
           </section>
         )}
+
+        <JointSummary workout={workout} />
 
         <BossHit before={r.campaignBefore} after={r.campaignAfter} damage={r.xpTotal} />
 

@@ -575,3 +575,18 @@ p { margin: 6px 0; }
 .welcome-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .welcome-hero h1 { font-size: 2.6rem; }
 .welcome-char { margin: 12px 0 4px; filter: drop-shadow(0 18px 30px #ff8a1f33); }
+
+/* Treino junto: placar lado a lado */
+.live-card .primary { width: 100%; margin-top: 10px; }
+.joint-board { border-color: #5ee0a844; }
+.jb-grid { display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px 12px; align-items: center; margin-top: 10px; }
+.jb-name { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jb-done { color: var(--rest); }
+.jb-label { font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.jb-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--muted); }
+.jb-cell .num { font-size: 1.05rem; }
+.jb-cell.lead { color: var(--text); }
+.jb-bar { height: 4px; border-radius: 4px; background: var(--well); overflow: hidden; }
+.jb-bar span { display: block; height: 100%; border-radius: 4px; background: var(--faint); transition: width 0.4s; }
+.jb-cell.lead .jb-bar span { background: var(--rest); }
+.jb-now { font-size: 0.85rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

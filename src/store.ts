@@ -8,6 +8,7 @@ import { dayKey } from './game/rules';
 import type { Bet, BetAnswer } from './game/bets';
 import type { MissionConfig } from './game/extras';
 import type { ProgramConfig } from './game/program';
+import { workoutStats } from './game/joint';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -55,6 +56,32 @@ export interface LiveInfo {
   sets: number;
   session?: string;
   last?: { exerciseId: string; weight: number; reps: number; at: string };
+  /** Para o treino junto: volume (kg), km e minutos de cardio até agora. */
+  volume?: number;
+  /** Séries de força sem aquecimento (`sets` conta todos os registros). */
+  strengthSets?: number;
+  km?: number;
+  cardioMin?: number;
+  /** Preenchido ao terminar: o par ainda vê o tempo final por um tempo. */
+  finishedAt?: string;
+}
+
+/** Resumo ao vivo do treino em andamento. */
+function liveOf(w: Workout, session?: string): LiveInfo {
+  const st = workoutStats(w.sets);
+  const s = w.sets.at(-1);
+  return {
+    id: w.id,
+    startedAt: w.startedAt,
+    ...(session ? { session } : {}),
+    sets: w.sets.length,
+    volume: st.volume,
+    strengthSets: st.sets,
+    km: st.km,
+    cardioMin: st.cardioMin,
+    ...(s ? { last: { exerciseId: s.exerciseId, weight: s.weight, reps: s.reps, at: new Date().toISOString() } } : {}),
+    ...(w.finishedAt ? { finishedAt: w.finishedAt } : {}),
+  };
 }
 
 /** Dados de perfil que vêm da nuvem. */
@@ -221,7 +248,7 @@ export const useStore = create<State>()(
               sets: [],
               ...(plan ? { plan: { program: plan.program, week: plan.week, session: plan.session } } : {}),
             };
-            return { active, live: { id: active.id, startedAt: active.startedAt, sets: 0, ...(plan ? { session: plan.name } : {}) }, metaAt: Date.now() };
+            return { active, live: liveOf(active, plan?.name), metaAt: Date.now() };
           }),
         setProgram: (program) => update(() => ({ program, metaAt: Date.now() })),
         setMissions: (missions) => update(() => ({ missions, metaAt: Date.now() })),
@@ -252,22 +279,23 @@ export const useStore = create<State>()(
         addSet: (s) =>
           update((p) => {
             if (!p.active) return {};
-            const at = new Date().toISOString();
-            const sets = [...p.active.sets, { ...s, id: uid() }];
-            return {
-              active: { ...p.active, sets },
-              live: { id: p.active.id, startedAt: p.active.startedAt, session: p.live?.session, sets: sets.length, last: { exerciseId: s.exerciseId, weight: s.weight, reps: s.reps, at } },
-              metaAt: Date.now(),
-            };
+            const active = { ...p.active, sets: [...p.active.sets, { ...s, id: uid() }] };
+            return { active, live: liveOf(active, p.live?.session), metaAt: Date.now() };
           }),
-        removeSet: (id) => update((p) => (p.active ? { active: { ...p.active, sets: p.active.sets.filter((s) => s.id !== id) } } : {})),
+        removeSet: (id) =>
+          update((p) => {
+            if (!p.active) return {};
+            const active = { ...p.active, sets: p.active.sets.filter((s) => s.id !== id) };
+            return { active, live: liveOf(active, p.live?.session), metaAt: Date.now() };
+          }),
         setDeload: (deload) => update((p) => (p.active ? { active: { ...p.active, deload } } : {})),
         finishWorkout: () => {
           const p = currentProfile(get());
           if (!p.active) return;
           if (p.active.sets.length === 0) return update(() => ({ active: null, live: null, metaAt: Date.now() }));
           const done = { ...p.active, finishedAt: new Date().toISOString() };
-          update((q) => ({ workouts: [...q.workouts, done], active: null, live: null, metaAt: Date.now() }));
+          // O "ao vivo" fica com o tempo final, para o par comparar no treino junto.
+          update((q) => ({ workouts: [...q.workouts, done], active: null, live: liveOf(done, q.live?.session), metaAt: Date.now() }));
           set({ summaryId: done.id });
         },
         discardWorkout: () => update(() => ({ active: null, live: null, metaAt: Date.now() })),

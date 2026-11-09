@@ -7,6 +7,7 @@ import { buildProgram, loadTarget, prescription } from '../game/program';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
 import { currentProfile, useProfile, useStore } from '../store';
 import { notifyPartner } from '../push';
+import { LiveJointBoard } from '../components/JointBoard';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -203,6 +204,7 @@ export default function WorkoutScreen() {
       </header>
 
       <main className="screen">
+        <LiveJointBoard active={active} now={now} />
         {queue && !picking && (
           <div className="queue" aria-label={`Ficha ${queue.name}`}>
             <span className="eyebrow">{queue.name}</span>
