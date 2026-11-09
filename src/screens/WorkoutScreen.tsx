@@ -1,0 +1,272 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Stepper, fmt } from '../components/ui';
+import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
+import { computeProgress, isSuspiciousWeight } from '../game/rules';
+import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise } from '../game/types';
+import { useStore } from '../store';
+
+const RIR_OPTIONS: { label: string; value: number | null }[] = [
+  { label: '0', value: 0 },
+  { label: '1', value: 1 },
+  { label: '2', value: 2 },
+  { label: '3', value: 3 },
+  { label: '4+', value: 4 },
+  { label: '?', value: null },
+];
+const REST_SECONDS = 90;
+
+function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
+  return now;
+}
+
+function mmss(sec: number) {
+  const s = Math.max(0, Math.floor(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export default function WorkoutScreen() {
+  const { active, workouts, settings, addSet, removeSet, setDeload, finishWorkout, discardWorkout } = useStore();
+  const now = useNow();
+  const [exercise, setExercise] = useState<Exercise | null>(null);
+  const [picking, setPicking] = useState(true);
+  const [weight, setWeight] = useState(20);
+  const [reps, setReps] = useState(10);
+  const [rir, setRir] = useState<number | null>(2);
+  const [warmup, setWarmup] = useState(false);
+  const [restUntil, setRestUntil] = useState<number | null>(null);
+  const [floaters, setFloaters] = useState<{ id: number; text: string }[]>([]);
+  const floaterId = useRef(0);
+
+  // XP ao vivo: simula o treino atual como se terminasse agora.
+  const preview = useMemo(() => {
+    if (!active) return 0;
+    const p = computeProgress([...workouts, { ...active, finishedAt: new Date().toISOString() }], settings);
+    return p.results[active.id]?.xpTotal ?? 0;
+  }, [active, workouts, settings]);
+
+  const prevXp = useRef(preview);
+  const prevCount = useRef(active?.sets.length ?? 0);
+  useEffect(() => {
+    const count = active?.sets.length ?? 0;
+    if (count > prevCount.current) {
+      const gained = preview - prevXp.current;
+      const id = ++floaterId.current;
+      setFloaters((f) => [...f, { id, text: `+${gained} XP` }]);
+      setTimeout(() => setFloaters((f) => f.filter((x) => x.id !== id)), 1200);
+      navigator.vibrate?.(30);
+    }
+    prevXp.current = preview;
+    prevCount.current = count;
+  }, [preview, active?.sets.length]);
+
+  if (!active) return null;
+
+  const elapsed = (now - new Date(active.startedAt).getTime()) / 1000;
+  const rest = restUntil ? (restUntil - now) / 1000 : 0;
+  const cardio = exercise?.kind === 'cardio';
+
+  const choose = (ex: Exercise) => {
+    setExercise(ex);
+    setPicking(false);
+    const all = [...workouts.flatMap((w) => w.sets), ...active.sets];
+    const last = [...all].reverse().find((s) => s.exerciseId === ex.id);
+    if (ex.kind === 'cardio') {
+      setReps(last?.reps ?? 20);
+    } else {
+      setWeight(last?.weight ?? 20);
+      setReps(last?.reps ?? 10);
+    }
+  };
+
+  const register = () => {
+    if (!exercise) return;
+    if (!cardio && isSuspiciousWeight(workouts, exercise.id, weight)) {
+      if (!confirm(`${fmt(weight)} ${settings.unit} é bem acima do seu máximo em ${exercise.name}. Confirmar?`)) return;
+    }
+    addSet({ exerciseId: exercise.id, weight: cardio ? 0 : weight, reps, rir: cardio ? null : warmup ? null : rir, warmup: cardio ? false : warmup });
+    if (!cardio) setRestUntil(Date.now() + REST_SECONDS * 1000);
+  };
+
+  const finish = () => {
+    if (active.sets.length === 0) {
+      if (confirm('Nenhuma série registrada. Sair do treino?')) discardWorkout();
+      return;
+    }
+    finishWorkout();
+  };
+
+  // Agrupa as séries por exercício, na ordem em que apareceram.
+  const groups: { ex: Exercise; sets: typeof active.sets }[] = [];
+  for (const s of active.sets) {
+    const ex = EXERCISE_BY_ID[s.exerciseId];
+    if (!ex) continue;
+    const g = groups.find((x) => x.ex.id === ex.id);
+    if (g) g.sets.push(s);
+    else groups.push({ ex, sets: [s] });
+  }
+
+  return (
+    <div className="app">
+      <header className="workout-head">
+        <div>
+          <div className="muted small">Treino em andamento</div>
+          <div className="timer">{mmss(elapsed)}</div>
+        </div>
+        <div className="xp-live" aria-live="polite">
+          {preview} XP
+          {floaters.map((f) => (
+            <span key={f.id} className="floater">
+              {f.text}
+            </span>
+          ))}
+        </div>
+      </header>
+
+      <main className="screen">
+        {picking ? (
+          <ExercisePicker onPick={choose} onCancel={exercise ? () => setPicking(false) : undefined} />
+        ) : (
+          exercise && (
+            <section className="card">
+              <div className="row between">
+                <h2>{exercise.name}</h2>
+                <button className="link" onClick={() => setPicking(true)}>
+                  Trocar
+                </button>
+              </div>
+              <div className="muted small">
+                {ATTRIBUTE_LABEL[exercise.primary]}
+                {exercise.secondary && ` + ${ATTRIBUTE_LABEL[exercise.secondary]}`}
+                {exercise.bossId && ' · ⚔️ chefe'}
+              </div>
+
+              {cardio ? (
+                <Stepper label="Minutos" value={reps} onChange={setReps} step={5} min={1} />
+              ) : (
+                <>
+                  <div className="steppers">
+                    <Stepper label="Carga" value={weight} onChange={setWeight} step={2.5} suffix={settings.unit} />
+                    <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={1} />
+                  </div>
+                  <div className="field">
+                    <span className="stepper-label">RIR (reps na reserva)</span>
+                    <div className="chips">
+                      {RIR_OPTIONS.map((o) => (
+                        <button
+                          key={o.label}
+                          type="button"
+                          disabled={warmup}
+                          className={`chip${!warmup && rir === o.value ? ' on' : ''}`}
+                          onClick={() => setRir(o.value)}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <label className="toggle">
+                    <input type="checkbox" checked={warmup} onChange={(e) => setWarmup(e.target.checked)} />
+                    Série de aquecimento
+                  </label>
+                </>
+              )}
+
+              <button className="primary big" onClick={register}>
+                Registrar série
+              </button>
+            </section>
+          )
+        )}
+
+        {rest > 0 && (
+          <div className="rest">
+            <span>Descanso: {mmss(rest)}</span>
+            <button className="link" onClick={() => setRestUntil(null)}>
+              Pular
+            </button>
+          </div>
+        )}
+
+        {groups.map((g) => (
+          <section key={g.ex.id} className="card compact">
+            <h3>{g.ex.name}</h3>
+            <ol className="sets">
+              {g.sets.map((s, i) => (
+                <li key={s.id}>
+                  <span className="muted">{i + 1}.</span>
+                  {g.ex.kind === 'cardio' ? (
+                    <span>{s.reps} min</span>
+                  ) : (
+                    <span>
+                      {fmt(s.weight)} {settings.unit} × {s.reps}
+                      {s.warmup ? <em className="muted"> aquec.</em> : s.rir !== null && <em className="muted"> RIR {s.rir === 4 ? '4+' : s.rir}</em>}
+                    </span>
+                  )}
+                  <button className="link danger" aria-label="Remover série" onClick={() => removeSet(s.id)}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+
+        <label className="toggle card compact">
+          <input type="checkbox" checked={active.deload} onChange={(e) => setDeload(e.target.checked)} />
+          <span>
+            Treino de deload <span className="muted small">(conta como semana cumprida)</span>
+          </span>
+        </label>
+
+        <div className="row gap">
+          <button className="ghost" onClick={() => confirm('Descartar este treino?') && discardWorkout()}>
+            Descartar
+          </button>
+          <button className="primary grow" onClick={finish}>
+            Concluir treino
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; onCancel?: () => void }) {
+  const [q, setQ] = useState('');
+  const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const list = EXERCISES.filter((e) => norm(e.name).includes(norm(q)));
+
+  return (
+    <section className="card">
+      <div className="row between">
+        <h2>Escolha o exercício</h2>
+        {onCancel && (
+          <button className="link" onClick={onCancel}>
+            Voltar
+          </button>
+        )}
+      </div>
+      <input className="search" placeholder="Buscar..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+      {ATTRIBUTES.map((a) => {
+        const items = list.filter((e) => e.primary === a);
+        if (!items.length) return null;
+        return (
+          <div key={a} className="pick-group">
+            <div className="muted small">{ATTRIBUTE_LABEL[a]}</div>
+            {items.map((e) => (
+              <button key={e.id} className="pick" onClick={() => onPick(e)}>
+                {e.name}
+                {e.bossId && <span aria-label="chefe"> ⚔️</span>}
+              </button>
+            ))}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
