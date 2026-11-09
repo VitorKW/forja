@@ -27,6 +27,38 @@ export function weightTrend(list: BodyWeight[]) {
   return { avg, now: avg[last], delta, days: ref >= 0 ? Math.round((t(ws[last].day) - t(ws[ref].day)) / DAY) : 0 };
 }
 
+// ---------- Medidas ----------
+
+export const MEASURES = [
+  { id: 'cintura', label: 'Cintura' },
+  { id: 'quadril', label: 'Quadril' },
+  { id: 'braco', label: 'Braço' },
+  { id: 'coxa', label: 'Coxa' },
+  { id: 'peito', label: 'Peito' },
+] as const;
+export type MeasureId = (typeof MEASURES)[number]['id'];
+
+/** Medidas de um dia, em cm. */
+export interface Measure {
+  day: string;
+  cm: Partial<Record<MeasureId, number>>;
+}
+
+/** Junta as medidas de um dia às que já existiam (só troca as preenchidas). */
+export function addMeasures(list: Measure[], day: string, cm: Partial<Record<MeasureId, number>>): Measure[] {
+  const clean = Object.fromEntries(Object.entries(cm).filter(([, v]) => typeof v === 'number' && v >= 10 && v <= 250)) as Measure['cm'];
+  if (!Object.keys(clean).length) return list;
+  const old = list.find((m) => m.day === day);
+  return [...list.filter((m) => m.day !== day), { day, cm: { ...old?.cm, ...clean } }].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/** Série de uma medida e a mudança desde o primeiro registro. */
+export function measureSeries(list: Measure[], id: MeasureId) {
+  const pts = list.filter((m) => m.cm[id] !== undefined).map((m) => ({ day: m.day, value: m.cm[id]! }));
+  const change = pts.length >= 2 ? Math.round((pts[pts.length - 1].value - pts[0].value) * 10) / 10 : null;
+  return { pts, change, since: pts[0]?.day ?? null };
+}
+
 export interface BestSet {
   weight: number;
   reps: number;

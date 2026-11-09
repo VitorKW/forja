@@ -9,6 +9,9 @@ import type { Bet, BetAnswer } from './game/bets';
 import type { MissionConfig } from './game/extras';
 import type { ProgramConfig } from './game/program';
 import { workoutStats } from './game/joint';
+import type { Redemption, Reward } from './game/rewards';
+import type { CycleConfig, DayCheck, WellnessLog } from './game/wellness';
+import { addMeasures, type Measure, type MeasureId } from './game/evolution';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -55,6 +58,16 @@ export interface Profile {
   missions?: MissionConfig;
   /** Treino acontecendo agora, para o par acompanhar. */
   live?: LiveInfo | null;
+  /** Recompensas do casal criadas por este perfil. */
+  rewards?: Reward[];
+  /** Recompensas resgatadas por este perfil (gastam moedas). */
+  redeemed?: Redemption[];
+  /** Sono e disposição por dia. */
+  wellness?: WellnessLog;
+  /** Medidas corporais. */
+  measures?: Measure[];
+  /** Ciclo menstrual: fica SÓ neste celular (fora de metaOf, nunca vai para a nuvem). */
+  cycle?: CycleConfig;
 }
 
 /** Resumo do treino em andamento que vai para a nuvem. */
@@ -115,10 +128,14 @@ export interface RemoteMeta {
   meals?: Meal[];
   frozenWeeks?: string[];
   notes?: Record<string, string>;
+  rewards?: Reward[];
+  redeemed?: Redemption[];
+  wellness?: WellnessLog;
+  measures?: Measure[];
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks', 'notes'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks', 'notes', 'rewards', 'redeemed', 'wellness', 'measures'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -142,6 +159,11 @@ export function metaOf(p: Profile): RemoteMeta {
     ...(p.meals?.length ? { meals: p.meals } : {}),
     ...(p.frozenWeeks?.length ? { frozenWeeks: p.frozenWeeks } : {}),
     ...(p.notes && Object.keys(p.notes).length ? { notes: p.notes } : {}),
+    ...(p.rewards?.length ? { rewards: p.rewards } : {}),
+    ...(p.redeemed?.length ? { redeemed: p.redeemed } : {}),
+    ...(p.wellness && Object.keys(p.wellness).length ? { wellness: p.wellness } : {}),
+    ...(p.measures?.length ? { measures: p.measures } : {}),
+    // `cycle` fica de fora de propósito: é privado e não sincroniza.
   };
 }
 
@@ -222,6 +244,14 @@ interface State {
   /** Corrige as séries de um treino já terminado. */
   editWorkout: (id: string, sets: SetEntry[]) => void;
   setDietGoals: (g: DietGoals) => void;
+  addReward: (name: string, cost: number) => void;
+  /** Só apaga recompensas criadas por este perfil. */
+  deleteReward: (id: string) => void;
+  /** Resgata pagando com as moedas do perfil atual. */
+  redeemReward: (r: Reward) => void;
+  checkIn: (day: string, patch: DayCheck) => void;
+  logMeasures: (day: string, cm: Partial<Record<MeasureId, number>>) => void;
+  setCycle: (c: CycleConfig) => void;
   proposeBet: (b: Omit<Bet, 'id' | 'createdAt'>) => Bet;
   cancelBet: (id: string) => void;
   answerBet: (id: string, accepted: boolean) => void;
@@ -410,6 +440,23 @@ export const useStore = create<State>()(
           const meal = (currentProfile(get()).meals ?? []).find((m) => m.id === id);
           for (const it of meal?.items ?? []) get().addFood(it, day);
         },
+        addReward: (name, cost) =>
+          update((p) => ({
+            rewards: [...(p.rewards ?? []), { id: uid(), name: name.trim().slice(0, 40), cost: Math.round(cost), createdAt: new Date().toISOString() }],
+            metaAt: Date.now(),
+          })),
+        deleteReward: (id) =>
+          update((p) => ((p.rewards ?? []).some((r) => r.id === id) ? { rewards: (p.rewards ?? []).map((r) => (r.id === id ? { ...r, deleted: true } : r)), metaAt: Date.now() } : {})),
+        redeemReward: (r) =>
+          update((p) => ({
+            redeemed: [...(p.redeemed ?? []), { id: uid(), rewardId: r.id, name: r.name, cost: r.cost, at: new Date().toISOString() }],
+            metaAt: Date.now(),
+          })),
+        checkIn: (day, patch) =>
+          update((p) => ({ wellness: { ...(p.wellness ?? {}), [day]: { ...(p.wellness?.[day] ?? {}), ...patch } }, metaAt: Date.now() })),
+        logMeasures: (day, cm) => update((p) => ({ measures: addMeasures(p.measures ?? [], day, cm), metaAt: Date.now() })),
+        // Sem metaAt: o ciclo não sincroniza.
+        setCycle: (cycle) => update(() => ({ cycle })),
         freezeWeek: (week) =>
           update((p) => ((p.frozenWeeks ?? []).includes(week) ? {} : { frozenWeeks: [...(p.frozenWeeks ?? []), week], metaAt: Date.now() })),
         editWorkout: (id, sets) =>

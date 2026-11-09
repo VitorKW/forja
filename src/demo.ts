@@ -167,6 +167,17 @@ export function demoProfiles(): Profile[] {
       equipped: { capa: 'rubi', pet: 'slime' },
       bets: [betA, betOld],
       betAnswers: {},
+      rewards: [
+        { id: 'demo-rw-1', name: 'Jantar fora', cost: 800, createdAt: at(30, 20).toISOString() },
+        { id: 'demo-rw-2', name: 'Escolher o filme da noite', cost: 150, createdAt: at(30, 20).toISOString() },
+      ],
+      redeemed: [{ id: 'demo-rd-1', rewardId: 'demo-rw-2', name: 'Escolher o filme da noite', cost: 150, at: at(6, 21).toISOString() }],
+      wellness: Object.fromEntries([1, 2, 3, 4, 5, 6].map((d) => [dayKey(at(d, 8)), { sleep: (rand() < 0.7 ? 3 : 2) as 2 | 3, energy: 3 as const }])),
+      measures: [
+        { day: dayKey(at(63, 8)), cm: { cintura: 86, braco: 34.5 } },
+        { day: dayKey(at(35, 8)), cm: { cintura: 85, braco: 35 } },
+        { day: dayKey(at(7, 8)), cm: { cintura: 83.5, braco: 35.5 } },
+      ],
     },
     {
       ...base,
@@ -184,6 +195,7 @@ export function demoProfiles(): Profile[] {
       equipped: { capa: 'safira' },
       bets: [],
       betAnswers: answersB,
+      rewards: [{ id: 'demo-rw-3', name: 'Massagem', cost: 400, createdAt: at(25, 20).toISOString() }],
       // Treinando agora, para mostrar o card ao vivo.
       live: lastA
         ? { id: 'demo-live', startedAt: new Date(Date.now() - 25 * 60000).toISOString(), sets: 9, strengthSets: 8, volume: 2740, km: 0, cardioMin: 0, session: 'Full body B', last: { exerciseId: 'stiff', weight: 35, reps: 12, at: new Date().toISOString() } }

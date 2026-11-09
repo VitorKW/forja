@@ -1,4 +1,4 @@
-﻿/// <reference types="vitest/config" />
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -15,7 +15,7 @@ export default defineConfig({
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       workbox: {
         // Fontes latinas entram no cache para o app funcionar offline com a tipografia certa.
-        globPatterns: ['**/*.{js,css,html,svg,png}', '**/*-latin-*.woff2'],
+        globPatterns: ['**/*.{js,css,html,svg,png,gif}', '**/*-latin-*.woff2'],
         // Recebe as notificações (lembretes e avisos do par).
         importScripts: ['push-sw.js'],
       },

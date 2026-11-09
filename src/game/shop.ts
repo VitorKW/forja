@@ -6,6 +6,7 @@
 import type { DuoState } from './duo';
 import { DUO_ACHIEVEMENT_COINS } from './duoAchievements';
 import { FREEZE } from './rules';
+import { MONTH } from './monthly';
 
 export const COINS = {
   boss: 40,
@@ -54,11 +55,13 @@ export interface CoinSources {
   betCoins?: number;
   /** Conquistas do casal já feitas. */
   duoAchievements?: number;
+  /** Chefes do mês derrotados (cada um recebe as moedas). */
+  monthsWon?: number;
 }
 
 export function coinsEarned(s: CoinSources): number {
   let c = s.bossesDefeated * COINS.boss + s.achievements * COINS.achievement + s.fullHabitDays * COINS.habitDay;
-  c += (s.jointWorkouts ?? 0) * COINS.joint + (s.seasonCoins ?? 0) + (s.betCoins ?? 0) + (s.duoAchievements ?? 0) * DUO_ACHIEVEMENT_COINS;
+  c += (s.jointWorkouts ?? 0) * COINS.joint + (s.seasonCoins ?? 0) + (s.betCoins ?? 0) + (s.duoAchievements ?? 0) * DUO_ACHIEVEMENT_COINS + (s.monthsWon ?? 0) * MONTH.coins;
   if (s.duo) {
     c += s.duo.state.raidsWon * COINS.raid;
     c += s.duo.state.challengeWins[s.duo.me] * COINS.challenge;
@@ -67,9 +70,9 @@ export function coinsEarned(s: CoinSources): number {
   return c;
 }
 
-/** Gastos: itens da loja e semanas congeladas. */
-export function coinsSpent(purchases: string[], frozenWeeks = 0): number {
-  return purchases.reduce((sum, id) => sum + (ITEM_BY_ID[id]?.price ?? 0), 0) + frozenWeeks * FREEZE.cost;
+/** Gastos: itens da loja, semanas congeladas e recompensas do casal resgatadas. */
+export function coinsSpent(purchases: string[], frozenWeeks = 0, redeemed: { cost: number }[] = []): number {
+  return purchases.reduce((sum, id) => sum + (ITEM_BY_ID[id]?.price ?? 0), 0) + frozenWeeks * FREEZE.cost + redeemed.reduce((s, r) => s + r.cost, 0);
 }
 
 export function canBuy(item: ShopItem, balance: number, purchases: string[], raidsWon: number): boolean {

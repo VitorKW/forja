@@ -28,6 +28,8 @@ export interface Weekly {
   unit: string;
   mine: number;
   theirs: number;
+  /** Sono da semana, já em texto (ex.: "Dormiu bem 4 de 6 noites."). */
+  sleep?: string;
 }
 
 /** Texto do lembrete da noite, ou null se não há nada pendente. */
@@ -68,6 +70,7 @@ export function weeklyFor(status: Status | undefined, now = Date.now()): { title
     `Você ${w.days}/${w.goal} dias, ${w.partner} ${w.partnerDays}/${w.partnerGoal}.`,
     w.raidLeft <= 0 ? `${w.boss} derrotado juntos! 🏆` : `${w.boss} ainda com ${w.raidLeft}% de vida.`,
     `${w.challenge}: você ${n(w.mine)} × ${n(w.theirs)} ${w.unit}.`,
+    ...(w.sleep ? [w.sleep] : []),
   ];
   const fresh = status.day === local.toISOString().slice(0, 10);
   if (status.weekLeft > 0 && !(fresh && status.trained)) parts.push(`Hoje é o último dia: falta${status.weekLeft > 1 ? 'm' : ''} ${status.weekLeft} para a meta.`);

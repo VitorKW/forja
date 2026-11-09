@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stepper, fmt } from '../components/ui';
 import RestTimer, { unlockSound, useRest } from '../components/RestTimer';
 import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
-import { cardioXp, computeProgress, countsAsWorkout, estimate1RM, isSuspiciousWeight, recordTarget, suggestLoad } from '../game/rules';
+import { cardioXp, computeProgress, countsAsWorkout, dayKey, estimate1RM, isSuspiciousWeight, recordTarget, suggestLoad } from '../game/rules';
+import { cycleInfo, easeOff, lastTop, recoveryAdvice } from '../game/wellness';
+import ExecutionHint from '../components/ExecutionHint';
 import { buildProgram, loadTarget, prescription } from '../game/program';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
 import { currentProfile, useProfile, useStore } from '../store';
@@ -38,7 +40,7 @@ function mmss(sec: number) {
 export default function WorkoutScreen() {
   const { active, workouts, settings, templates = [], program } = useProfile();
   const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate, updateSettings, setNote } = useStore();
-  const notes = useProfile().notes ?? {};
+  const { notes = {}, wellness, cycle } = useProfile();
   const restSeconds = settings.restSeconds ?? 90;
   const [queue, setQueue] = useState<Template | null>(null);
   const now = useNow();
@@ -93,9 +95,17 @@ export default function WorkoutScreen() {
   const elapsed = (now - new Date(active.startedAt).getTime()) / 1000;
   const cardio = exercise?.kind === 'cardio';
   const slot = exercise ? planSession?.slots.find((s) => s.exerciseId === exercise.id) : undefined;
-  const target = slot ? loadTarget(workouts, slot, !!planWeek?.deload) : null;
+  // Dia ruim de recuperação ou fase do ciclo que pede calma: a sugestão não sobe a carga.
+  const today = dayKey(new Date());
+  const holdReason = recoveryAdvice(wellness ?? {}, today)
+    ? 'Recuperação baixa hoje: não precisa subir.'
+    : cycleInfo(cycle, today)?.easy
+      ? 'Fase do ciclo que pede calma: não precisa subir.'
+      : null;
+  const top = exercise ? lastTop(workouts, exercise.id) : null;
+  const target = slot ? easeOff(loadTarget(workouts, slot, !!planWeek?.deload), top, holdReason) : null;
   const slotDone = (id: string) => active.sets.filter((s) => s.exerciseId === id && !s.warmup).length;
-  const suggestion = exercise && !cardio && !slot ? suggestLoad(workouts, exercise.id) : null;
+  const suggestion = exercise && !cardio && !slot ? easeOff(suggestLoad(workouts, exercise.id), top, holdReason) : null;
   const nextSlot = slot && slotDone(slot.exerciseId) >= slot.sets ? planSession?.slots.find((s) => slotDone(s.exerciseId) < s.sets) : undefined;
   const doneIds = new Set(active.sets.map((s) => s.exerciseId));
   // Anilhas (só em kg e exercícios de barra) e aquecimento antes da primeira série de trabalho.
@@ -280,6 +290,7 @@ export default function WorkoutScreen() {
                 {ATTRIBUTE_LABEL[exercise.primary]}
                 {exercise.secondary && ` + ${ATTRIBUTE_LABEL[exercise.secondary]}`}
               </div>
+              <ExecutionHint exerciseId={exercise.id} />
               <button
                 className="ex-note"
                 onClick={() => {

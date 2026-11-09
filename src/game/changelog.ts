@@ -7,6 +7,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: 12,
+    date: '2026-11-09',
+    items: [
+      'Recompensas do casal (aba Dupla): combinem prêmios de verdade e paguem com moedas',
+      'Desafio do mês: chefe dourado com escudo, só cai com os treinos dos dois (+100 moedas)',
+      'Como você está hoje: sono e disposição; em dia ruim a sugestão não sobe a carga',
+      'Medidas (cintura, quadril, braço…) com gráfico, na Evolução',
+      'Ciclo menstrual opcional e privado (Perfil): fica só no seu celular',
+      'Bonequinho mostrando a execução dos exercícios principais',
+    ],
+  },
+  {
     version: 11,
     date: '2026-11-09',
     items: [

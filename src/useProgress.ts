@@ -9,6 +9,7 @@ import { computeBets } from './game/bets';
 import { coinsEarned, coinsSpent } from './game/shop';
 import { useStore, type Profile } from './store';
 import { duoAchievements, type DuoStats } from './game/duoAchievements';
+import { computeMonthly, type MonthState } from './game/monthly';
 
 /** Metas de hoje. */
 export function goalsOf(p: Profile): DietGoals {
@@ -68,6 +69,17 @@ export function useGame() {
     return computeDuo(player(0), player(1));
   }, [profiles, all]);
 
+  const monthly: MonthState | null = useMemo(() => {
+    if (profiles.length < 2) return null;
+    const player = (i: number) => ({
+      name: profiles[i].name,
+      workouts: profiles[i].workouts,
+      xpOf: (id: string) => all[i].results[id]?.xpTotal ?? 0,
+      weeklyGoal: profiles[i].settings.weeklyGoal,
+    });
+    return computeMonthly(player(0), player(1));
+  }, [profiles, all]);
+
   const season: SeasonState | null = useMemo(
     () => (profiles.length < 2 ? null : computeSeasons(timelines[0], timelines[1])),
     [profiles.length, timelines],
@@ -109,9 +121,10 @@ export function useGame() {
       seasonCoins: season?.coins[me] ?? 0,
       betCoins: bets.coins[me],
       duoAchievements: duoDone.length,
+      monthsWon: monthly?.won ?? 0,
     });
-    return { earned, balance: earned - coinsSpent(p.purchases ?? [], p.frozenWeeks?.length ?? 0) };
-  }, [profiles, all, duo, me, habits, joint, season, bets, duoDone]);
+    return { earned, balance: earned - coinsSpent(p.purchases ?? [], p.frozenWeeks?.length ?? 0, p.redeemed ?? []) };
+  }, [profiles, all, duo, me, habits, joint, season, bets, duoDone, monthly]);
 
   return {
     profiles,
@@ -119,6 +132,7 @@ export function useGame() {
     me,
     partner,
     duo,
+    monthly,
     coins,
     joint,
     duoStats,

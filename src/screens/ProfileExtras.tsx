@@ -5,7 +5,7 @@ import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import { dayKey, estimate1RM, weekKey, nextWeek } from '../game/rules';
 import { canBuy, SHOP, type ShopItem } from '../game/shop';
-import { bestSetOf, weightTrend } from '../game/evolution';
+import { bestSetOf, MEASURES, measureSeries, weightTrend, type MeasureId } from '../game/evolution';
 import { useStore } from '../store';
 import { useGame } from '../useProgress';
 
@@ -181,7 +181,89 @@ export function Evolution() {
           Registrar
         </button>
       </div>
+
+      <Measures />
     </section>
+  );
+}
+
+/** Medidas (cm): gráfico de uma medida por vez e um formulário para as de hoje. */
+function Measures() {
+  const { profile } = useGame();
+  const logMeasures = useStore((s) => s.logMeasures);
+  const list = profile.measures ?? [];
+  const [which, setWhich] = useState<MeasureId>('cintura');
+  const [draft, setDraft] = useState<Partial<Record<MeasureId, string>>>({});
+  const [open, setOpen] = useState(false);
+  const { pts, change, since } = measureSeries(list, which);
+  const used = MEASURES.filter((m) => list.some((x) => x.cm[m.id] !== undefined));
+  const label = MEASURES.find((m) => m.id === which)!.label;
+
+  const save = () => {
+    const cm = Object.fromEntries(
+      Object.entries(draft)
+        .map(([k, v]) => [k, Math.round(Number(String(v).replace(',', '.')) * 10) / 10])
+        .filter(([, v]) => Number.isFinite(v) && (v as number) > 0),
+    );
+    logMeasures(dayKey(new Date()), cm);
+    setDraft({});
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <div className="row between baseline chart-head">
+        <h3>Medidas</h3>
+        {used.length > 1 && (
+          <select className="mini-select" value={which} onChange={(e) => setWhich(e.target.value as MeasureId)} aria-label="Medida">
+            {used.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      {pts.length >= 2 ? (
+        <>
+          <LineChart data={pts.map((p) => ({ label: shortDate(p.day), value: p.value }))} unit="cm" caption={`${label} ao longo do tempo`} />
+          {change !== null && since && (
+            <p className="muted small chart-note">
+              {label}: <strong>{change > 0 ? '+' : change < 0 ? '−' : '±'}{fmt(Math.abs(change))} cm</strong> desde {shortDate(since)}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="muted small">
+          {pts.length === 1 ? `${label}: ${fmt(pts[0].value)} cm em ${shortDate(pts[0].day)}. ` : ''}A balança às vezes não mexe, mas a fita mostra. Meça a cada 2–4 semanas, de manhã, no mesmo lugar.
+        </p>
+      )}
+      {open ? (
+        <>
+          <div className="measure-form">
+            {MEASURES.map((m) => (
+              <label key={m.id}>
+                {m.label}
+                <input
+                  className="search"
+                  inputMode="decimal"
+                  placeholder="cm"
+                  value={draft[m.id] ?? ''}
+                  onChange={(e) => setDraft({ ...draft, [m.id]: e.target.value })}
+                />
+              </label>
+            ))}
+          </div>
+          <button className="ghost" onClick={save} disabled={!Object.values(draft).some((v) => v && Number(v.replace(',', '.')) > 0)}>
+            Salvar medidas de hoje
+          </button>
+        </>
+      ) : (
+        <button className="link small" onClick={() => setOpen(true)}>
+          + Registrar medidas de hoje
+        </button>
+      )}
+    </>
   );
 }
 

@@ -200,6 +200,8 @@ const ENFEITES = {
   dragao: [[0, 6, "d\ndd\ndbd\ndbbd\ndbbbd\n.dbbbd\n..dbbb\n...ddd"], [6, 0, ".x\nxx"]],
   // Rainha: coroa sobre o elmo
   rainha: [[8, 0, "t.t.\ntttt"], [10, 0, "..t\n.tt"]],
+  // Chefe do mês: coroa larga e brasas nos ombros
+  coroa: [[7, 0, "t.t.t\nttttt"], [1, 9, ".ee\neee"]],
 }
 
 const CHEFES = [
@@ -215,6 +217,7 @@ const CHEFES = [
   ["chefe-10", "serpente", ["#a8231a", "#5c120c", "#e2483a", "#fff1c9"], "dragao"],
   ["chefe-11", "cavaleiro", ["#d9dde3", "#8b929c", "#ffffff", "#ef6a1f"], "rainha"],
   ["chefe-12", "chama", ["#f7b538", "#c8321a", "#fff1c9", "#7a1a0d"]],
+  ["chefe-mes", "golem", ["#d8a03a", "#7a5212", "#ffd76b", "#ff3d2e"], "coroa"],
 ]
 
 for (const [nome, forma, [b, d, h, e], enfeite] of CHEFES) {

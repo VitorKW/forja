@@ -9,6 +9,8 @@ import { JOINT } from '../game/duo';
 import { SEASON_TIERS, SEASON_WIN_COINS, tiersReached } from '../game/season';
 import { useGame } from '../useProgress';
 import Bets from '../components/Bets';
+import MonthBoss from '../components/MonthBoss';
+import Rewards from '../components/Rewards';
 import YearCalendar from '../components/YearCalendar';
 
 const rise = (i: number) => ({
@@ -94,6 +96,8 @@ export default function Duo() {
         </p>
       </motion.section>
 
+      <MonthBoss />
+
       <motion.section className="card season" {...rise(1)}>
         <div className="row between">
           <span className="eyebrow">Temporada</span>
@@ -137,6 +141,10 @@ export default function Duo() {
           </ul>
         )}
       </motion.section>
+
+      <motion.div {...rise(2)}>
+        <Rewards />
+      </motion.div>
 
       <motion.div {...rise(2)}>
         <Bets />

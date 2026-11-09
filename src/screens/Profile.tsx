@@ -15,6 +15,7 @@ import { countsAsWorkout } from '../game/rules';
 import type { Attribute } from '../game/types';
 import { PushPanel } from '../components/PushPanel';
 import BackupPanel from '../components/BackupPanel';
+import CyclePanel from '../components/CyclePanel';
 
 const GEAR: Record<Attribute, string> = {
   empurrar: 'Ombreiras',
@@ -240,6 +241,8 @@ export default function Profile() {
       <SyncPanel />
 
       <BackupPanel />
+
+      <CyclePanel />
 
       <section className="panel">
         <h2>Configurações</h2>

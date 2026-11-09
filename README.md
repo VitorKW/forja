@@ -1,4 +1,4 @@
-﻿# 🔥 Forja
+# 🔥 Forja
 
 **Um app de treino em que cada série vira XP.** Você registra o treino, seu personagem em pixel art ganha nível e equipamento, e os chefes são os seus próprios recordes. Em dupla, o casal enfrenta chefes juntos, aposta, compete por temporada e acompanha o treino do outro ao vivo.
 
@@ -24,7 +24,9 @@ Projeto pessoal de Vitor Wessler (Engenharia de Computação + Educação Físic
 | **Programa periodizado** | Bloco de 6 ou 8 semanas montado pela frequência (full body, superior/inferior, PPL), com RIR alvo caindo de 3 para 1, volume subindo na segunda metade e deload no fim |
 | **Progressão de jogo** | XP, nível, 5 atributos (empurrar, puxar, pernas, core, fôlego) que equipam o personagem, conquistas, chefes = recordes pessoais |
 | **Hábitos** | Missões diárias personalizáveis; dieta leve (proteína, água, calorias) que marca missões sozinha |
-| **Em dupla** | Chefe semanal com o XP dos dois, sequência do casal, desafio da semana, treino junto (bônus), apostas valendo moedas, temporadas trimestrais, calendário do ano, treino ao vivo com incentivo na hora |
+| **Recuperação** | Sono e disposição do dia e ciclo menstrual opcional (privado, não sai do celular): em dia ruim a sugestão de carga não sobe |
+| **Corpo** | Peso com média de 7 dias, medidas com gráfico, 1RM estimado por exercício |
+| **Em dupla** | Chefe semanal com o XP dos dois, chefe do mês com escudo, recompensas reais pagas com moedas, sequência do casal, desafio da semana, treino junto (bônus), apostas valendo moedas, temporadas trimestrais, calendário do ano, treino ao vivo com incentivo na hora |
 | **Social sem servidor pago** | Sincronização entre celulares (Firestore) e notificações push (Cloudflare Workers), tudo no plano grátis |
 | **Retrospectiva** | Resumo do mês com recordes e uma imagem gerada em canvas para compartilhar |
 
@@ -102,5 +104,7 @@ As sugestões de treino seguem referências gerais da literatura e não substitu
 ```bash
 node ~/.claude/skills/pxl-pixel-art/bin/pxl.js build art/personagem.px.js --out art/out/personagem
 node ~/.claude/skills/pxl-pixel-art/bin/pxl.js build art/chefes.px.js --out art/out/chefes
+node ~/.claude/skills/pxl-pixel-art/bin/pxl.js build art/exercicios.px.js --out art/out/exercicios
 cp art/out/personagem/sprites/*.png art/out/chefes/sprites/*.png public/sprites/
+cp art/out/exercicios/anims/exec-*.{gif,png} public/sprites/
 ```

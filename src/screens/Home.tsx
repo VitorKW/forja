@@ -11,6 +11,7 @@ import { activeMissions, HABIT_XP } from '../game/extras';
 import MissionsEditor from '../components/MissionsEditor';
 import ProgramCard from '../components/ProgramCard';
 import LiveCard from '../components/LiveCard';
+import CheckIn from '../components/CheckIn';
 import { useMemo, useState } from 'react';
 import BossSprite from '../components/BossSprite';
 import { monthKey, monthName, shiftMonth } from '../game/recap';
@@ -176,6 +177,8 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
           </p>
         </div>
       </motion.section>
+
+      <CheckIn profile={profile} />
 
       <motion.div {...rise(2)}>
         <ProgramCard profile={profile} />

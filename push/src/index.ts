@@ -56,6 +56,7 @@ function cleanWeekly(w: Weekly): Weekly {
     unit: clip(w.unit, 12),
     mine: num(w.mine, 100000),
     theirs: num(w.theirs, 100000),
+    ...(typeof w.sleep === 'string' && w.sleep ? { sleep: clip(w.sleep, 120) } : {}),
   };
 }
 

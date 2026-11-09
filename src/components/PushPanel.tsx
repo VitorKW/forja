@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { activeMissions } from '../game/extras';
-import { dayKey, weekKey } from '../game/rules';
+import { dayKey, weekKey, type Progress } from '../game/rules';
+import { weekSleepNote } from '../game/wellness';
 import { disablePush, enablePush, pushSlot, pushSupport, sendStatus, testPush } from '../push';
-import { useStore } from '../store';
+import { useStore, type Profile } from '../store';
 import { useGame } from '../useProgress';
 
 /** Liga e desliga os lembretes neste celular. */
@@ -102,6 +103,12 @@ export function PushStatusReporter() {
   return <Reporter code={code} slot={slot} />;
 }
 
+/** Linha de sono para o resumo de domingo (só com 3+ noites registradas). */
+function sleepOf(p: Profile, prog: Progress, now: Date): { sleep?: string } {
+  const note = weekSleepNote(p.wellness ?? {}, p.workouts, (id) => prog.results[id]?.xpTotal ?? 0, weekKey(now));
+  return note ? { sleep: note } : {};
+}
+
 function Reporter({ code, slot }: { code: string; slot: 0 | 1 }) {
   const { profiles, all, habits, duo } = useGame();
   const other = slot === 0 ? 1 : 0;
@@ -131,6 +138,7 @@ function Reporter({ code, slot }: { code: string; slot: 0 | 1 }) {
             unit: duo.challenge.unit,
             mine: duo.challenge.values[slot],
             theirs: duo.challenge.values[other],
+            ...sleepOf(p, prog, now),
           },
         }
       : {}),
