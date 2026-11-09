@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Campanha de chefes: todo XP ganho é dano no chefe atual.
  * A campanha não tem fim: depois dos 12 chefes, voltam "ecos" cada vez mais fortes.
  */
@@ -63,64 +63,7 @@ export function campaignAt(totalDamage: number): CampaignState {
   return { boss: bossAt(i), damage: left, defeated: i };
 }
 
-// ---------- Sprites desenhados à mão ----------
-// Metade esquerda (8 colunas × 16 linhas), espelhada na hora de desenhar.
-// 'k' contorno, 'b' corpo, 'd' sombra, 'h' brilho, 'e' olho, 'm' boca, 't' dente, 'x' chifre/osso.
-
-export type Shape = 'gosma' | 'morcego' | 'golem' | 'serpente' | 'cavaleiro' | 'hidra' | 'chama';
-
-const SHAPES: Record<Shape, string[]> = {
-  gosma: [
-    '........', '........', '........', '........',
-    '.......k', '.....kkh', '....khhb', '...khbbb',
-    '..khbbbb', '..kbbekb', '.kbbbbbb', '.kbbbmmm',
-    '.kbbbbbb', 'kbdbbbdb', 'kddddddd', '.kkkkkkk',
-  ],
-  morcego: [
-    '........', 'kk...k..', 'khk.kxk.', 'khhkkbbk',
-    'khbhkbbb', 'kbbbkbek', 'kbbbbbbb', '.kbbbbmt',
-    '.kbbdbbm', '..kbkbbb', '..kk.kbb', '.....kdd',
-    '......kk', '........', '........', '........',
-  ],
-  golem: [
-    '........', '....kkkk', '...khhhh', '...khbbb',
-    '...kbekb', '...kbbbb', '.kkkkddd', 'khhkhhbb',
-    'khbkhbbb', 'kbbkbebb', 'kbbkbbbb', 'kddkbbbd',
-    '.kk.kbbb', '....kbbk', '...kbbbk', '...kkkkk',
-  ],
-  serpente: [
-    '..k.....', '.kxk....', '.kxxk...', '..kxbkkk',
-    '..kbbhhh', '.kbbbbbb', 'kbbekbbb', 'kbbbbbbb',
-    'kbmmmmmm', 'kbmtmtmt', 'kbmmmmmm', '.kbbbbbb',
-    '..kddbdd', '...kkddd', '....kddd', '....kkkk',
-  ],
-  cavaleiro: [
-    '.......k', '......kx', '....kkkk', '...khhhh',
-    '...khbbb', '...kbkkk', '...kbkek', '...kbbbb',
-    '.kkkkddd', 'khhkhhhh', 'khbkbbbb', 'kbbkbdbb',
-    '.kkkbbbb', '....kbbk', '...kbbbk', '...kkkkk',
-  ],
-  hidra: [
-    '........', '.kkk..kk', 'khhhk.kh', 'kbebk.ke',
-    'kmmbk.kb', '.kbbk.kb', '..kbbkbb', '..kdbbbb',
-    '...kbbbb', '..kbbbbb', '.kbbbbbb', '.kbdbbdb',
-    '.kddddbd', '..kkkkdd', '......kk', '........',
-  ],
-  chama: [
-    '.......k', '......kh', '...k.khh', '..kh.khb',
-    '..khkhbb', '.khbbbbb', '.kbbbbbb', 'kbbbebbb',
-    'kbbbbbbb', 'kbbbbmmm', 'kdbbbbbb', '.kdbbbbb',
-    '.kddbbbd', '..kddddd', '...kkkkk', '........',
-  ],
-};
-
-const SHAPE_ORDER: Shape[] = ['gosma', 'gosma', 'morcego', 'golem', 'serpente', 'morcego', 'cavaleiro', 'hidra', 'golem', 'serpente', 'cavaleiro', 'chama'];
-
-export function bossShape(def: BossDef): Shape {
-  return SHAPE_ORDER[def.index % SHAPE_ORDER.length];
-}
-
-/** Grade 16 × 16 do chefe (já espelhada). */
-export function bossSprite(def: BossDef): string[][] {
-  return SHAPES[bossShape(def)].map((half) => [...half, ...[...half].reverse()]);
+/** Nome do PNG do chefe em public/sprites (feito com a skill pxl, fonte em art/chefes.px.js). Os ecos reusam o desenho. */
+export function bossSpriteName(def: BossDef): string {
+  return `chefe-${String((def.index % BASE.length) + 1).padStart(2, '0')}`;
 }

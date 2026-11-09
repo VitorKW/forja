@@ -1,4 +1,4 @@
-# 🔥 Forja
+﻿# 🔥 Forja
 
 App web de treino gamificado: cada série que você registra forja um personagem que ganha XP, sobe de nível e enfrenta chefes que são os seus próprios recordes.
 
@@ -39,3 +39,14 @@ O design completo está em [GDD.md](GDD.md). Resumo:
 - Mais de 20 séries semanais num mesmo atributo → fadiga, e o XP cai pela metade.
 - Meta semanal cumprida → +75 XP e +10% de multiplicador (até +50%).
 - Chefe: vida = 1RM estimado (Epley) × 1,025.
+
+
+## Pixel art
+
+Os sprites são código, feitos com a skill [pxl](https://github.com/crsolver/claude-pxl) (Node 22.18+):
+
+```bash
+node ~/.claude/skills/pxl-pixel-art/bin/pxl.js build art/personagem.px.js --out art/out/personagem
+node ~/.claude/skills/pxl-pixel-art/bin/pxl.js build art/chefes.px.js --out art/out/chefes
+cp art/out/personagem/sprites/*.png art/out/chefes/sprites/*.png public/sprites/
+```

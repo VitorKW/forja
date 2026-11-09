@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { bossAt, bossSprite, campaignAt } from './campaign';
+﻿import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { bossAt, bossSpriteName, campaignAt } from './campaign';
 import {
   cardioXp,
   computeProgress,
@@ -200,19 +201,17 @@ describe('campanha de chefes', () => {
     expect(bossAt(12).hp).toBeGreaterThan(bossAt(11).hp);
   });
 
-  it('chefes crescem e todo sprite é 16 × 16, simétrico e com olhos', () => {
+  it('chefes crescem e todo chefe tem um sprite', () => {
     expect(bossAt(10).size).toBeGreaterThan(bossAt(0).size);
+    const names = new Set<string>();
     for (let i = 0; i < 12; i++) {
-      const g = bossSprite(bossAt(i));
-      expect(g).toHaveLength(16);
-      for (const row of g) {
-        expect(row).toHaveLength(16);
-        expect(row.join('')).toBe([...row].reverse().join(''));
-      }
-      expect(g.flat().filter((c) => c === 'e').length).toBeGreaterThanOrEqual(2);
+      const name = bossSpriteName(bossAt(i));
+      names.add(name);
+      expect(existsSync(new URL(`../../public/sprites/${name}.png`, import.meta.url))).toBe(true);
     }
+    expect(names.size).toBe(12);
+    expect(bossSpriteName(bossAt(12))).toBe(bossSpriteName(bossAt(0)));
   });
-
   it('o resultado do treino mostra o antes e o depois na campanha', () => {
     const sets = Array.from({ length: 20 }, () => set('rosca', 10, 10, 2));
     const w = workout('2026-11-09T10:00:00', sets); // 20 × 13 + 30 = 290
