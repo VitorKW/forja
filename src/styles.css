@@ -600,3 +600,15 @@ p { margin: 6px 0; }
 .kcal-calc select { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; max-width: 60%; }
 .kcal-calc .ghost { width: 100%; margin-top: 8px; }
 .seg button.on { background: var(--surface-hi); color: var(--text); }
+/* Busca de alimentos (TACO) */
+.food-search { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.food-results { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--well); }
+.food-results li + li { border-top: 1px solid var(--line); }
+.food-results button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; font-size: 0.9rem; }
+.food-results .num { font-size: 0.8rem; white-space: nowrap; }
+.food-pick { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin-bottom: 10px; border-radius: 16px; background: var(--well); border: 1px solid var(--line-hi); }
+.food-pick .chips.grams { display: flex; flex-wrap: wrap; gap: 6px; }
+.food-pick .chips.grams .chip { padding: 8px 12px; font-size: 0.9rem; }
+.recent-foods { display: flex; flex-direction: column; gap: 6px; }
+.recent-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.recent-list .qchip { text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

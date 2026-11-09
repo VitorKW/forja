@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { BarChart, type Point } from '../components/Charts';
+import FoodSearch from '../components/FoodSearch';
 import { fmt } from '../components/ui';
 import { ACTIVITY, KCAL_GOALS, kcalFor, kcalStatus, proteinFor, QUICK_FOODS, totals, WATER_STEPS, waterFor, type DietGoals, type KcalInput } from '../game/diet';
 import { dayKey } from '../game/rules';
@@ -230,6 +231,8 @@ export default function Diet() {
             </button>
           </div>
         </div>
+        <FoodSearch onAdd={add} log={profile.dietLog} />
+        <span className="field-label">Atalhos</span>
         <div className="food-grid">
           {QUICK_FOODS.map((f) => (
             <motion.button
