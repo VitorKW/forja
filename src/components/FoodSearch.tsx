@@ -16,7 +16,7 @@ export function recentFoods(log: DietLog = {}, limit = 6): NewEntry[] {
     const e = all[i];
     if (e.agua > 0 || e.label === 'Total do dia' || seen.has(e.label)) continue;
     seen.add(e.label);
-    out.push({ label: e.label, proteina: e.proteina, kcal: e.kcal, agua: 0 });
+    out.push({ label: e.label, proteina: e.proteina, kcal: e.kcal, agua: 0, ...(e.carbs !== undefined ? { carbs: e.carbs, fat: e.fat ?? 0 } : {}) });
   }
   return out;
 }
@@ -47,7 +47,7 @@ export default function FoodSearch({ onAdd, log }: { onAdd: (e: NewEntry, key: s
   };
   const add = () => {
     if (!pick || !n || g <= 0) return;
-    onAdd({ label: `${pick.name} (${fmt(g, 0)} g)`, proteina: n.proteina, kcal: n.kcal, agua: 0 }, 'busca');
+    onAdd({ label: `${pick.name} (${fmt(g, 0)} g)`, ...n, agua: 0 }, 'busca');
     setPick(null);
     setQ('');
   };

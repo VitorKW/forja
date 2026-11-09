@@ -103,7 +103,8 @@ export function PushStatusReporter() {
 }
 
 function Reporter({ code, slot }: { code: string; slot: 0 | 1 }) {
-  const { profiles, all, habits } = useGame();
+  const { profiles, all, habits, duo } = useGame();
+  const other = slot === 0 ? 1 : 0;
   const p = profiles[slot];
   const prog = all[slot];
   const now = new Date();
@@ -116,6 +117,23 @@ function Reporter({ code, slot }: { code: string; slot: 0 | 1 }) {
     trained: p.workouts.some((w) => w.finishedAt && dayKey(new Date(w.finishedAt)) === today),
     habitsLeft: activeMissions(p.missions).filter((h) => !habits[slot][today]?.includes(h.id)).length,
     weekLeft: Math.max(0, prog.week.goal - prog.week.days),
+    ...(duo && profiles[other]
+      ? {
+          weekly: {
+            days: prog.week.days,
+            goal: prog.week.goal,
+            partner: profiles[other].name,
+            partnerDays: all[other].week.days,
+            partnerGoal: all[other].week.goal,
+            raidLeft: Math.max(0, Math.round(((duo.raid.hp - duo.raid.damage[0] - duo.raid.damage[1]) / duo.raid.hp) * 100)),
+            boss: duo.raid.boss.name,
+            challenge: duo.challenge.label,
+            unit: duo.challenge.unit,
+            mine: duo.challenge.values[slot],
+            theirs: duo.challenge.values[other],
+          },
+        }
+      : {}),
   };
   const key = JSON.stringify(status);
   useEffect(() => {

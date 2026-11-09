@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { dayKey } from '../game/rules';
+import { dietCsv, workoutsCsv } from '../game/csv';
 import { useStore, type Profile } from '../store';
 
 interface BackupFile {
@@ -22,13 +23,13 @@ export function parseBackup(text: string): BackupFile | null {
   }
 }
 
-async function saveFile(text: string, filename: string): Promise<'shared' | 'downloaded'> {
-  const blob = new Blob([text], { type: 'application/json' });
-  const file = new File([blob], filename, { type: 'application/json' });
+async function saveFile(text: string, filename: string, type = 'application/json'): Promise<'shared' | 'downloaded'> {
+  const blob = new Blob([text], { type });
+  const file = new File([blob], filename, { type });
   // No iPhone a folha de compartilhar deixa salvar em Arquivos, mandar no WhatsApp etc.
   if (/iPhone|iPad|Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Backup do Forja' });
+      await navigator.share({ files: [file], title: filename });
       return 'shared';
     } catch {
       /* cancelou: cai para o download */
@@ -55,6 +56,16 @@ export default function BackupPanel() {
     setNote(r === 'downloaded' ? 'Backup salvo nos downloads.' : 'Backup pronto.');
   };
 
+  // Planilhas: treinos (uma linha por série) e dieta (uma linha por alimento).
+  const exportCsv = async () => {
+    const { profiles } = useStore.getState();
+    const bom = String.fromCharCode(0xfeff); // para o Excel reconhecer os acentos
+    const day = dayKey(new Date());
+    await saveFile(bom + workoutsCsv(profiles), `forja-treinos-${day}.csv`, 'text/csv');
+    const r = await saveFile(bom + dietCsv(profiles), `forja-dieta-${day}.csv`, 'text/csv');
+    setNote(r === 'downloaded' ? 'Planilhas de treinos e dieta salvas nos downloads.' : 'Planilhas prontas.');
+  };
+
   const importFile = async (f: File | undefined) => {
     if (!f) return;
     const b = parseBackup(await f.text());
@@ -79,6 +90,9 @@ export default function BackupPanel() {
           Importar
         </button>
       </div>
+      <button className="link small" onClick={exportCsv}>
+        Exportar planilhas (CSV) de treinos e dieta
+      </button>
       <input ref={input} type="file" accept="application/json,.json" hidden onChange={(e) => importFile(e.target.files?.[0])} />
       {note && <p className="muted small">{note}</p>}
     </section>

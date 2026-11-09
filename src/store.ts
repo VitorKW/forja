@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { BodyWeight, SetEntry, Settings, Template, Workout } from './game/types';
 import type { Cheer, CheerKind, HabitId, HabitLog } from './game/extras';
 import type { ItemKind } from './game/shop';
-import { changeGoals, compactDiet, type GoalChange, type DietEntry, type DietGoals, type DietLog } from './game/diet';
+import { changeGoals, compactDiet, type GoalChange, type Meal, type DietEntry, type DietGoals, type DietLog } from './game/diet';
 import { dayKey } from './game/rules';
 import type { Bet, BetAnswer } from './game/bets';
 import type { MissionConfig } from './game/extras';
@@ -39,6 +39,10 @@ export interface Profile {
   dietGoals?: DietGoals;
   /** Quando cada meta passou a valer (mudar a meta não muda o passado). */
   dietGoalsLog?: GoalChange[];
+  /** Refeições salvas. */
+  meals?: Meal[];
+  /** Semanas congeladas na loja (a sequência não quebra). */
+  frozenWeeks?: string[];
   /** Apostas propostas por este perfil. */
   bets?: Bet[];
   /** Respostas deste perfil às apostas do par. */
@@ -106,10 +110,12 @@ export interface RemoteMeta {
   program?: ProgramConfig | null;
   missions?: MissionConfig;
   live?: LiveInfo | null;
+  meals?: Meal[];
+  frozenWeeks?: string[];
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -130,6 +136,8 @@ export function metaOf(p: Profile): RemoteMeta {
     ...(p.dietGoals ? { dietGoals: p.dietGoals } : {}),
     ...(p.dietGoalsLog?.length ? { dietGoalsLog: p.dietGoalsLog } : {}),
     ...(p.missions ? { missions: p.missions } : {}),
+    ...(p.meals?.length ? { meals: p.meals } : {}),
+    ...(p.frozenWeeks?.length ? { frozenWeeks: p.frozenWeeks } : {}),
   };
 }
 
@@ -201,6 +209,13 @@ interface State {
   /** day: AAAA-MM-DD (padrão: hoje), para registrar algo esquecido de ontem. */
   addFood: (e: Omit<DietEntry, 'id' | 'at'>, day?: string) => void;
   removeFood: (day: string, id: string) => void;
+  saveMeal: (name: string, items: Meal['items']) => void;
+  deleteMeal: (id: string) => void;
+  addMeal: (id: string, day?: string) => void;
+  /** Congela uma semana que ficou abaixo da meta (custa moedas). */
+  freezeWeek: (week: string) => void;
+  /** Corrige as séries de um treino já terminado. */
+  editWorkout: (id: string, sets: SetEntry[]) => void;
   setDietGoals: (g: DietGoals) => void;
   proposeBet: (b: Omit<Bet, 'id' | 'createdAt'>) => Bet;
   cancelBet: (id: string) => void;
@@ -375,6 +390,19 @@ export const useStore = create<State>()(
             log[d] = [...(log[d] ?? []), { ...e, id: uid(), at: at.toISOString() }];
             return { dietLog: compactDiet(log, today), metaAt: Date.now() };
           }),
+        saveMeal: (name, items) =>
+          update((p) => ({ meals: [...(p.meals ?? []), { id: uid(), name, items }].slice(-20), metaAt: Date.now() })),
+        deleteMeal: (id) => update((p) => ({ meals: (p.meals ?? []).filter((m) => m.id !== id), metaAt: Date.now() })),
+        addMeal: (id, day) => {
+          const meal = (currentProfile(get()).meals ?? []).find((m) => m.id === id);
+          for (const it of meal?.items ?? []) get().addFood(it, day);
+        },
+        freezeWeek: (week) =>
+          update((p) => ((p.frozenWeeks ?? []).includes(week) ? {} : { frozenWeeks: [...(p.frozenWeeks ?? []), week], metaAt: Date.now() })),
+        editWorkout: (id, sets) =>
+          update((p) => ({
+            workouts: p.workouts.map((w) => (w.id === id && w.finishedAt ? { ...w, sets, editedAt: Date.now() } : w)),
+          })),
         removeFood: (day, id) =>
           update((p) => {
             const log = { ...(p.dietLog ?? {}) };
@@ -407,9 +435,21 @@ export const useStore = create<State>()(
             const gone = new Set([...(p.deleted ?? []), ...dead]);
             const have = new Set(p.workouts.map((w) => w.id));
             const added = live.filter((w) => !have.has(w.id) && !gone.has(w.id));
-            const kept = p.workouts.filter((w) => !gone.has(w.id));
+            // Treino editado em outro celular: vence a edição mais recente.
+            const remote = new Map(live.map((w) => [w.id, w]));
+            let edited = 0;
+            const kept = p.workouts
+              .filter((w) => !gone.has(w.id))
+              .map((w) => {
+                const r = remote.get(w.id);
+                if (r && (r.editedAt ?? 0) > (w.editedAt ?? 0)) {
+                  edited++;
+                  return r;
+                }
+                return w;
+              });
             const newDead = dead.filter((id) => !(p.deleted ?? []).includes(id));
-            if (added.length === 0 && kept.length === p.workouts.length && newDead.length === 0) return null;
+            if (added.length === 0 && edited === 0 && kept.length === p.workouts.length && newDead.length === 0) return null;
             return { workouts: [...kept, ...added].sort(byStart), deleted: [...(p.deleted ?? []), ...newDead] };
           }),
       };

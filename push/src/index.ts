@@ -4,12 +4,13 @@
  * Guarda, por grupo e por pessoa, as inscrições de push e um resumo do dia
  * (treinou hoje? quantas missões faltam?). Duas funções:
  *   - /notify: o app de um avisa o outro ("terminou o treino", "propôs uma aposta").
- *   - cron às 20h (Brasília): lembrete para quem ainda tem treino ou missão em aberto.
+ *   - cron às 20h (Brasília): lembrete para quem ainda tem treino ou missão em aberto;
+ *     no domingo, o resumo da semana do casal.
  *
  * O código do grupo funciona como senha, igual na sincronização do Firebase.
  */
 import { sendPush, type PushSubscriptionJSON, type Vapid } from './webpush';
-import { reminderFor, type Status } from './reminder';
+import { reminderFor, weeklyFor, type Status, type Weekly } from './reminder';
 
 export interface Env {
   FORJA: KVNamespace;
@@ -40,6 +41,23 @@ function cors(env: Env, req: Request): Record<string, string> {
 }
 
 const vapidOf = (env: Env): Vapid => ({ privateJwk: JSON.parse(env.VAPID_PRIVATE_JWK), publicKey: env.VAPID_PUBLIC, subject: env.VAPID_SUBJECT });
+
+const num = (v: unknown, max: number) => Math.max(0, Math.min(max, Number(v) || 0));
+function cleanWeekly(w: Weekly): Weekly {
+  return {
+    days: num(w.days, 7),
+    goal: num(w.goal, 7),
+    partner: clip(w.partner, 20),
+    partnerDays: num(w.partnerDays, 7),
+    partnerGoal: num(w.partnerGoal, 7),
+    raidLeft: num(w.raidLeft, 100),
+    boss: clip(w.boss, 40),
+    challenge: clip(w.challenge, 60),
+    unit: clip(w.unit, 12),
+    mine: num(w.mine, 100000),
+    theirs: num(w.theirs, 100000),
+  };
+}
 
 async function load(env: Env, key: string): Promise<UserRec> {
   return ((await env.FORJA.get(key, 'json')) as UserRec | null) ?? { subs: [] };
@@ -101,6 +119,7 @@ export default {
         trained: !!s?.trained,
         habitsLeft: Math.max(0, Math.min(9, Number(s?.habitsLeft) || 0)),
         weekLeft: Math.max(0, Math.min(7, Number(s?.weekLeft) || 0)),
+        ...(s?.weekly ? { weekly: cleanWeekly(s.weekly) } : {}),
       };
       const rec = await load(env, key);
       // Só grava se mudou (o plano grátis tem 1000 gravações por dia).
@@ -143,8 +162,9 @@ export default {
       const page = await env.FORJA.list({ prefix: 'u:', cursor });
       for (const k of page.keys) {
         const rec = await load(env, k.name);
-        const msg = reminderFor(rec.status);
-        if (msg && rec.subs.length) await deliver(env, k.name, rec, { ...msg, tag: 'lembrete' });
+        const weekly = weeklyFor(rec.status);
+        const msg = weekly ?? reminderFor(rec.status);
+        if (msg && rec.subs.length) await deliver(env, k.name, rec, { ...msg, tag: weekly ? 'semana' : 'lembrete' });
       }
       cursor = page.list_complete ? undefined : page.cursor;
     } while (cursor);

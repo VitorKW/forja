@@ -72,9 +72,10 @@ export function portionOf(f: Pick<Food, 'name'>): { label: string; g: number } |
 }
 
 /** Proteína e calorias de uma quantidade em gramas. */
-export function nutrientsFor(f: Food, grams: number): { proteina: number; kcal: number } {
+export function nutrientsFor(f: Food, grams: number): { proteina: number; kcal: number; carbs: number; fat: number } {
   const g = Math.max(0, grams);
-  return { proteina: Math.round((f.protein * g) / 10) / 10, kcal: Math.round((f.kcal * g) / 100) };
+  const r1 = (v: number) => Math.round((v * g) / 10) / 10;
+  return { proteina: r1(f.protein), kcal: Math.round((f.kcal * g) / 100), carbs: r1(f.carbs), fat: r1(f.fat) };
 }
 
 const norm = (s: string) =>

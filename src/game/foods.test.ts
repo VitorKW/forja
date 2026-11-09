@@ -34,7 +34,7 @@ describe('tabela de alimentos', () => {
 
   it('quantidade em gramas e medida caseira', () => {
     const frango = byName('Frango, peito, sem pele, grelhado');
-    expect(nutrientsFor(frango, 150)).toEqual({ proteina: 48, kcal: 239 });
+    expect(nutrientsFor(frango, 150)).toEqual({ proteina: 48, kcal: 239, carbs: 0, fat: 3.8 });
     expect(portionOf(byName('Ovo, de galinha, inteiro, cozido'))).toEqual({ label: '1 unidade', g: 50 });
     expect(portionOf(byName('Leite, de vaca, integral, pó'))).toBeNull();
   });

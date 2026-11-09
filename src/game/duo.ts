@@ -46,6 +46,8 @@ export interface DuoState {
   raidsWon: number;
   /** Semanas seguidas (até a passada) em que os dois cumpriram a meta. */
   coupleStreak: number;
+  /** Maior sequência de semanas com os dois na meta. */
+  bestCoupleStreak: number;
   /** Os dois já cumpriram a meta desta semana? */
   coupleWeekDone: boolean;
   coupleWeeksTotal: number;
@@ -158,6 +160,7 @@ export function computeDuo(a: DuoPlayer, b: DuoPlayer, now: Date = new Date()): 
   const allWeeks = [...byWeek[0].keys(), ...byWeek[1].keys()].filter((k) => k <= current).sort();
   let raidsWon = 0;
   let coupleStreak = 0;
+  let bestCoupleStreak = 0;
   let coupleWeeksTotal = 0;
   const challengeWins: [number, number] = [0, 0];
 
@@ -166,6 +169,7 @@ export function computeDuo(a: DuoPlayer, b: DuoPlayer, now: Date = new Date()): 
       if (damage(0, k) + damage(1, k) >= raidHp(raidsWon)) raidsWon++;
       if (goalMet(0, k) && goalMet(1, k)) {
         coupleStreak++;
+        bestCoupleStreak = Math.max(bestCoupleStreak, coupleStreak);
         coupleWeeksTotal++;
       } else coupleStreak = 0;
       const ch = challengeFor(k);
@@ -188,6 +192,7 @@ export function computeDuo(a: DuoPlayer, b: DuoPlayer, now: Date = new Date()): 
     raid: { week: current, boss: bossFor(current), hp, damage: dmg, defeated },
     raidsWon,
     coupleStreak,
+    bestCoupleStreak,
     coupleWeekDone,
     coupleWeeksTotal,
     challenge: {

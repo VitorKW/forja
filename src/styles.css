@@ -612,3 +612,24 @@ p { margin: 6px 0; }
 .recent-foods { display: flex; flex-direction: column; gap: 6px; }
 .recent-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .recent-list .qchip { text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Refeições salvas e macros */
+.meals { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.meal-save { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
+.records li input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--ember); flex-shrink: 0; }
+.macros { margin: 8px 0 0; }
+.faint { color: var(--faint); }
+/* Treino: super-série, aquecimento e anilhas */
+.superset { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0 4px; padding: 8px 12px; border-radius: 12px; background: #ff8a1f14; border: 1px solid #ff8a1f44; font-size: 0.88rem; }
+.warmup-hint { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.plates { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 2px 2px; }
+.plates select { background: var(--well); border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; color: var(--muted); }
+/* Corrigir séries */
+.edit-sets .sets li { gap: 6px; }
+.edit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; }
+.mini { width: 58px; padding: 6px 8px; border-radius: 10px; background: var(--well); border: 1px solid var(--line-hi); text-align: right; font-family: var(--pixel); }
+/* Congelar sequência e conquistas do casal */
+.freeze .primary { width: 100%; margin-top: 8px; }
+.duo-ach li { align-items: flex-start; }
+.duo-ach-icon { width: 28px; text-align: center; font-size: 1.2rem; color: var(--faint); }
+.duo-ach li.got strong { color: var(--gold); }
+.duo-ach .xpbar { margin-top: 6px; }

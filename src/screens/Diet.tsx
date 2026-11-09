@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { BarChart, type Point } from '../components/Charts';
 import FoodSearch from '../components/FoodSearch';
 import { fmt } from '../components/ui';
-import { ACTIVITY, KCAL_GOALS, kcalFor, kcalStatus, proteinFor, QUICK_FOODS, totals, WATER_STEPS, waterFor, type DietGoals, type KcalInput } from '../game/diet';
-import { dayKey } from '../game/rules';
+import { ACTIVITY, KCAL_GOALS, kcalFor, kcalGoalFor, kcalStatus, proteinFor, QUICK_FOODS, totals, WATER_STEPS, waterFor, type DietGoals, type KcalInput } from '../game/diet';
+import { countsAsWorkout, dayKey } from '../game/rules';
 import { useStore } from '../store';
 import { goalsOf, useGame } from '../useProgress';
 
@@ -101,6 +101,7 @@ function KcalCalc({ weight, onUse }: { weight?: number; onUse: (kcal: number) =>
 function GoalsForm({ goals, weight, onSave }: { goals: DietGoals; weight?: number; onSave: (g: DietGoals) => void }) {
   const [p, setP] = useState(String(goals.proteina));
   const [k, setK] = useState(goals.kcal ? String(goals.kcal) : '');
+  const [kr, setKr] = useState(goals.kcalRest ? String(goals.kcalRest) : '');
   const [a, setA] = useState(liters(goals.agua));
   const num = (s: string) => Number(s.replace(',', '.')) || 0;
   return (
@@ -128,6 +129,10 @@ function GoalsForm({ goals, weight, onSave }: { goals: DietGoals; weight?: numbe
         Calorias (kcal)
         <input className="name-input" inputMode="numeric" placeholder="sem meta" value={k} onChange={(e) => setK(e.target.value)} />
       </label>
+      <label className="setting">
+        Calorias em dia sem treino
+        <input className="name-input" inputMode="numeric" placeholder="igual" value={kr} onChange={(e) => setKr(e.target.value)} aria-label="Calorias em dia sem treino" />
+      </label>
       <KcalCalc weight={weight} onUse={(v) => setK(String(v))} />
       <button
         className="primary"
@@ -135,6 +140,7 @@ function GoalsForm({ goals, weight, onSave }: { goals: DietGoals; weight?: numbe
           onSave({
             proteina: Math.max(0, Math.round(num(p))),
             kcal: Math.max(0, Math.round(num(k))),
+            ...(num(kr) > 0 ? { kcalRest: Math.round(num(kr)) } : {}),
             agua: Math.max(0, Math.round(num(a) * 1000)),
           })
         }
@@ -147,7 +153,9 @@ function GoalsForm({ goals, weight, onSave }: { goals: DietGoals; weight?: numbe
 
 export default function Diet() {
   const { profile, profiles, partner } = useGame();
-  const { addFood, removeFood, setDietGoals } = useStore();
+  const { addFood, removeFood, setDietGoals, saveMeal, deleteMeal, addMeal } = useStore();
+  const [picking, setPicking] = useState<Set<string> | null>(null);
+  const [mealEdit, setMealEdit] = useState(false);
   const [editing, setEditing] = useState(false);
   const [custom, setCustom] = useState({ label: '', proteina: '', kcal: '' });
   const [flash, setFlash] = useState<string | null>(null);
@@ -166,8 +174,11 @@ export default function Diet() {
   const ot = other ? totals(other.dietLog?.[today]) : null;
   const og = other ? goalsOf(other) : null;
   const weight = profile.bodyWeights?.at(-1)?.kg;
+  const trainingDay = !!profile.active || profile.workouts.some((w) => w.finishedAt && dayKey(new Date(w.finishedAt)) === today && countsAsWorkout(w));
+  const kcalGoal = kcalGoalFor(goals, trainingDay);
+  const meals = profile.meals ?? [];
 
-  const add = (e: { label: string; proteina: number; kcal: number; agua: number }, key: string) => {
+  const add = (e: { label: string; proteina: number; kcal: number; agua: number; carbs?: number; fat?: number }, key: string) => {
     addFood(e, day);
     navigator.vibrate?.(12);
     setFlash(key);
@@ -216,7 +227,14 @@ export default function Diet() {
         </AnimatePresence>
         <Meter label="Proteína" value={t.proteina} goal={goals.proteina} unit="g" tone="protein" />
         <Meter label="Água" value={t.agua} goal={goals.agua} unit="L" tone="water" format={liters} />
-        <KcalMeter value={t.kcal} goal={goals.kcal} />
+        <KcalMeter value={t.kcal} goal={kcalGoal} />
+        {goals.kcalRest ? <p className="muted small">Hoje: {trainingDay ? 'dia de treino' : 'dia sem treino'} (a meta muda quando você termina um treino).</p> : null}
+        {(t.carbs > 0 || t.fat > 0) && (
+          <p className="macros muted small">
+            Carboidrato <span className="num">{fmt(t.carbs, 0)} g</span> · Gordura <span className="num">{fmt(t.fat, 0)} g</span>
+            <span className="faint"> (só alimentos da busca e dos atalhos)</span>
+          </p>
+        )}
       </motion.section>
 
       <motion.section className="card" {...rise(1)}>
@@ -231,6 +249,36 @@ export default function Diet() {
             </button>
           </div>
         </div>
+        {meals.length > 0 && (
+          <div className="meals">
+            <div className="row between baseline">
+              <span className="field-label">Refeições</span>
+              <button className="link small" onClick={() => setMealEdit((v) => !v)}>
+                {mealEdit ? 'Pronto' : 'Editar'}
+              </button>
+            </div>
+            <div className="recent-list">
+              {meals.map((m) => (
+                <button
+                  key={m.id}
+                  className="qchip"
+                  onClick={() => {
+                    if (mealEdit) {
+                      if (confirm(`Apagar a refeição "${m.name}"?`)) deleteMeal(m.id);
+                      return;
+                    }
+                    addMeal(m.id, day);
+                    navigator.vibrate?.(12);
+                  }}
+                  aria-label={mealEdit ? `Apagar ${m.name}` : `Adicionar ${m.name}: ${m.items.map((i) => i.label).join(', ')}`}
+                >
+                  {mealEdit && '× '}
+                  {m.name} <span className="muted small">· {fmt(m.items.reduce((s, i) => s + i.proteina, 0), 0)} g</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <FoodSearch onAdd={add} log={profile.dietLog} />
         <span className="field-label">Atalhos</span>
         <div className="food-grid">
@@ -239,7 +287,7 @@ export default function Diet() {
               key={f.id}
               className={`food${flash === f.id ? ' flash' : ''}`}
               whileTap={{ scale: 0.92 }}
-              onClick={() => add({ label: `${f.label} (${f.portion})`, proteina: f.proteina, kcal: f.kcal, agua: 0 }, f.id)}
+              onClick={() => add({ label: `${f.label} (${f.portion})`, proteina: f.proteina, kcal: f.kcal, carbs: f.carbs, fat: f.fat, agua: 0 }, f.id)}
               aria-label={`Adicionar ${f.label} (${f.portion}): ${f.proteina} g de proteína, ${f.kcal} kcal`}
             >
               <span className="food-icon" aria-hidden>
@@ -293,12 +341,50 @@ export default function Diet() {
 
       {dayEntries.length > 0 && (
         <motion.section className="card" {...rise(2)}>
-          <h2>{day === today ? 'Registros de hoje' : `Registros de ontem (${fmt(totals(dayEntries).proteina, 0)} g de proteína)`}</h2>
+          <div className="row between baseline">
+            <h2>{day === today ? 'Registros de hoje' : `Registros de ontem (${fmt(totals(dayEntries).proteina, 0)} g de proteína)`}</h2>
+            <button className="link small" onClick={() => setPicking(picking ? null : new Set())}>
+              {picking ? 'Cancelar' : 'Salvar refeição'}
+            </button>
+          </div>
+          {picking && (
+            <div className="meal-save">
+              <p className="muted small">Marque os alimentos da refeição (ex.: seu café da manhã de sempre).</p>
+              <button
+                className="primary"
+                disabled={!picking.size}
+                onClick={() => {
+                  const name = prompt('Nome da refeição:', meals.length ? `Refeição ${meals.length + 1}` : 'Café da manhã');
+                  if (!name?.trim()) return;
+                  saveMeal(
+                    name.trim().slice(0, 30),
+                    dayEntries.filter((e) => picking.has(e.id)).map(({ id: _id, at: _at, ...rest }) => rest),
+                  );
+                  setPicking(null);
+                }}
+              >
+                Salvar {picking.size || ''} {picking.size === 1 ? 'alimento' : 'alimentos'}
+              </button>
+            </div>
+          )}
           <ul className="records">
             <AnimatePresence initial={false}>
               {[...dayEntries].reverse().map((e) => (
                 <motion.li key={e.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, height: 0 }}>
-                  <div>
+                  {picking && (
+                    <input
+                      type="checkbox"
+                      aria-label={`Incluir ${e.label}`}
+                      checked={picking.has(e.id)}
+                      onChange={(ev) => {
+                        const s = new Set(picking);
+                        if (ev.target.checked) s.add(e.id);
+                        else s.delete(e.id);
+                        setPicking(s);
+                      }}
+                    />
+                  )}
+                  <div className="grow">
                     <strong>{e.label}</strong>
                     <div className="muted small">
                       {new Date(e.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

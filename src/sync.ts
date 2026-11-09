@@ -59,7 +59,8 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   // O que a nuvem já tem, para enviar só o que falta.
-  const remoteLive = SLOTS.map(() => new Set<string>());
+  // id → editedAt do que está na nuvem (0 = nunca editado).
+  const remoteLive = SLOTS.map(() => new Map<string, number>());
   const remoteDead = SLOTS.map(() => new Set<string>());
   const remoteMetaAt = SLOTS.map(() => -1);
   const pushedMeta = SLOTS.map(() => '');
@@ -107,9 +108,11 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
       }
       if (!workoutsReady[i]) continue;
       for (const w of p.workouts) {
-        if (!w.finishedAt || remoteLive[i].has(w.id) || remoteDead[i].has(w.id)) continue;
+        if (!w.finishedAt || remoteDead[i].has(w.id)) continue;
+        const there = remoteLive[i].get(w.id);
+        if (there !== undefined && there >= (w.editedAt ?? 0)) continue;
         batch.set(doc(ref, 'treinos', w.id), { json: JSON.stringify(w) });
-        remoteLive[i].add(w.id);
+        remoteLive[i].set(w.id, w.editedAt ?? 0);
         if (++n >= 400) await flush();
       }
       for (const id of p.deleted ?? []) {
@@ -179,8 +182,9 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
                   remoteLive[i].delete(d.id);
                 } else if (v.json) {
                   try {
-                    live.push(JSON.parse(v.json) as Workout);
-                    remoteLive[i].add(d.id);
+                    const w = JSON.parse(v.json) as Workout;
+                    live.push(w);
+                    remoteLive[i].set(d.id, w.editedAt ?? 0);
                   } catch {
                     /* treino corrompido: ignora */
                   }

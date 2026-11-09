@@ -11,6 +11,7 @@ import BossSprite from '../components/BossSprite';
 import type { CampaignState } from '../game/campaign';
 import { useGame, useProgress } from '../useProgress';
 import JointBoard from '../components/JointBoard';
+import EditSets from '../components/EditSets';
 import { durationSec, partnerWorkoutOf, startedTogether, workoutStats } from '../game/joint';
 import { JOINT } from '../game/duo';
 import type { Workout } from '../game/types';
@@ -137,6 +138,8 @@ export default function Summary({ workoutId }: { workoutId: string }) {
   const workout = useProfile().workouts.find((w) => w.id === workoutId);
   const r = p.results[workoutId];
   const shown = useCountUp(r?.xpTotal ?? 0);
+  const [editing, setEditing] = useState(false);
+  const unit = useProfile().settings.unit;
 
   if (!r || !workout) {
     return (
@@ -238,6 +241,14 @@ export default function Summary({ workoutId }: { workoutId: string }) {
             </p>
           )}
         </section>
+
+        {editing ? (
+          <EditSets workout={workout} unit={unit} onDone={() => setEditing(false)} />
+        ) : (
+          <button className="link center" onClick={() => setEditing(true)}>
+            Digitou algo errado? Corrigir séries
+          </button>
+        )}
 
         <button className="primary big" onClick={close}>
           Voltar à forja

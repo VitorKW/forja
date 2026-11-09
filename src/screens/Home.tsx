@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import Character from '../components/Character';
 import { XpBar, fmt } from '../components/ui';
-import { countsAsWorkout, dayKey, levelTitle, RULES } from '../game/rules';
+import { countsAsWorkout, dayKey, FREEZE, freezeOffer, levelTitle, RULES } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Attribute } from '../game/types';
 import { heatColor } from '../heat';
 import { useStore } from '../store';
@@ -11,7 +11,7 @@ import { activeMissions, HABIT_XP } from '../game/extras';
 import MissionsEditor from '../components/MissionsEditor';
 import ProgramCard from '../components/ProgramCard';
 import LiveCard from '../components/LiveCard';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import BossSprite from '../components/BossSprite';
 import { monthKey, monthName, shiftMonth } from '../game/recap';
 
@@ -59,6 +59,8 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
   const openRecap = useStore((s) => s.openRecap);
   const { workouts, look } = profile;
   const toggleHabit = useStore((s) => s.toggleHabit);
+  const freezeWeek = useStore((s) => s.freezeWeek);
+  const offer = useMemo(() => freezeOffer(workouts, profile.settings, profile.frozenWeeks ?? []), [workouts, profile.settings, profile.frozenWeeks]);
   const setMissions = useStore((s) => s.setMissions);
   const [editMissions, setEditMissions] = useState(false);
   const missions = activeMissions(profile.missions);
@@ -120,6 +122,24 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
           </div>
         </div>
       </motion.section>
+
+      {offer && (
+        <motion.section className="card warn freeze" {...rise(1)}>
+          <span className="eyebrow">Constância em risco</span>
+          <h2>A semana passada ficou abaixo da meta</h2>
+          <p className="muted small">
+            Sua constância caiu de {offer.streakIfFrozen} para {offer.streakNow} semanas (bônus de XP ×{fmt(1 + 0.1 * Math.min(5, offer.streakIfFrozen))} → ×{fmt(1 + 0.1 * Math.min(5, offer.streakNow))}). Dá para congelar uma semana a cada {FREEZE.everyWeeks}.
+          </p>
+          <button
+            className="primary"
+            disabled={coins.balance < FREEZE.cost}
+            onClick={() => confirm(`Congelar a semana passada por ${FREEZE.cost} moedas?`) && freezeWeek(offer.week)}
+          >
+            Congelar por {FREEZE.cost} moedas
+          </button>
+          {coins.balance < FREEZE.cost && <p className="muted small">Você tem {coins.balance} moedas.</p>}
+        </motion.section>
+      )}
 
       {showRecap && (
         <motion.button className="card recap-teaser" onClick={() => openRecap(lastMonth)} whileTap={{ scale: 0.98 }} {...rise(1)}>

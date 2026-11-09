@@ -19,7 +19,7 @@ const s = (exerciseId: string, weight: number, reps: number): SetEntry => ({ id:
 describe('dieta', () => {
   it('soma o dia e marca as missões quando bate a meta', () => {
     const log = { '2026-11-09': [entry(60, 1000), entry(70, 1000)], '2026-11-10': [entry(30, 500)] };
-    expect(totals(log['2026-11-09'])).toEqual({ proteina: 130, kcal: 0, agua: 2000 });
+    expect(totals(log['2026-11-09'])).toEqual({ proteina: 130, kcal: 0, agua: 2000, carbs: 0, fat: 0 });
     const h = dietHabits(log, { proteina: 120, kcal: 0, agua: 2000 });
     expect(h).toEqual({ '2026-11-09': ['proteina', 'agua'] });
     expect(mergeHabits({ '2026-11-09': ['sono', 'agua'] }, h)['2026-11-09'].sort()).toEqual(['agua', 'proteina', 'sono']);

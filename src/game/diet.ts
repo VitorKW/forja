@@ -12,6 +12,16 @@ export interface DietEntry {
   proteina: number; // g
   kcal: number;
   agua: number; // ml
+  /** Opcionais: vêm da busca na TACO (registros antigos não têm). */
+  carbs?: number; // g
+  fat?: number; // g
+}
+
+/** Refeição salva: vários alimentos lançados com um toque. */
+export interface Meal {
+  id: string;
+  name: string;
+  items: Omit<DietEntry, 'id' | 'at'>[];
 }
 
 /** Registros por dia: chave "AAAA-MM-DD". */
@@ -22,12 +32,21 @@ export interface DietGoals {
   /** 0 = sem meta de calorias. */
   kcal: number;
   agua: number; // ml
+  /** Calorias em dia sem treino (0 ou vazio = mesma meta). */
+  kcalRest?: number;
 }
 
 export interface DietTotals {
   proteina: number;
   kcal: number;
   agua: number;
+  carbs: number;
+  fat: number;
+}
+
+/** Meta de calorias do dia: a de descanso, se houver, quando não teve treino. */
+export function kcalGoalFor(goals: DietGoals, trainingDay: boolean): number {
+  return !trainingDay && goals.kcalRest ? goals.kcalRest : goals.kcal;
 }
 
 /**
@@ -35,14 +54,14 @@ export interface DietTotals {
  * Alimentos (TACO) para o alimento pronto. Servem para registrar rápido, não para pesar.
  */
 export const QUICK_FOODS = [
-  { id: 'ovo', label: 'Ovo', portion: '1 unidade', icon: '🥚', proteina: 6, kcal: 75 },
-  { id: 'frango', label: 'Frango', portion: '100 g grelhado', icon: '🍗', proteina: 32, kcal: 160 },
-  { id: 'carne', label: 'Carne', portion: '100 g cozida', icon: '🥩', proteina: 30, kcal: 230 },
-  { id: 'whey', label: 'Whey', portion: '1 dose de 30 g', icon: '🥤', proteina: 24, kcal: 120 },
-  { id: 'iogurte', label: 'Iogurte', portion: '1 pote de 170 g', icon: '🥛', proteina: 7, kcal: 100 },
-  { id: 'prato', label: 'Arroz e feijão', portion: '1 prato', icon: '🍛', proteina: 10, kcal: 300 },
-  { id: 'pao', label: 'Pão francês', portion: '1 unidade', icon: '🥖', proteina: 4, kcal: 150 },
-  { id: 'fruta', label: 'Fruta', portion: '1 banana ou maçã', icon: '🍌', proteina: 1, kcal: 80 },
+  { id: 'ovo', label: 'Ovo', portion: '1 unidade cozida', icon: '🥚', proteina: 7, kcal: 73, carbs: 0, fat: 5 },
+  { id: 'frango', label: 'Frango', portion: '100 g de peito grelhado', icon: '🍗', proteina: 32, kcal: 159, carbs: 0, fat: 2.5 },
+  { id: 'carne', label: 'Carne', portion: '100 g de patinho grelhado', icon: '🥩', proteina: 36, kcal: 219, carbs: 0, fat: 7 },
+  { id: 'whey', label: 'Whey', portion: '1 dose de 30 g', icon: '🥤', proteina: 24, kcal: 120, carbs: 3, fat: 2 },
+  { id: 'iogurte', label: 'Iogurte natural', portion: '1 pote de 170 g', icon: '🥛', proteina: 7, kcal: 87, carbs: 3, fat: 5 },
+  { id: 'prato', label: 'Arroz e feijão', portion: '1 escumadeira + 1 concha', icon: '🍛', proteina: 7, kcal: 191, carbs: 39, fat: 0.7 },
+  { id: 'pao', label: 'Pão francês', portion: '1 unidade', icon: '🥖', proteina: 4, kcal: 150, carbs: 29, fat: 1.5 },
+  { id: 'fruta', label: 'Banana', portion: '1 unidade', icon: '🍌', proteina: 1, kcal: 69, carbs: 18, fat: 0 },
 ] as const;
 
 export const WATER_STEPS = [
@@ -110,13 +129,16 @@ export function defaultGoals(weightKg?: number): DietGoals {
 }
 
 export function totals(entries: DietEntry[] = []): DietTotals {
-  const t = { proteina: 0, kcal: 0, agua: 0 };
+  const t = { proteina: 0, kcal: 0, agua: 0, carbs: 0, fat: 0 };
   for (const e of entries) {
     t.proteina += e.proteina;
     t.kcal += e.kcal;
     t.agua += e.agua;
+    t.carbs += e.carbs ?? 0;
+    t.fat += e.fat ?? 0;
   }
-  return t;
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  return { proteina: r1(t.proteina), kcal: Math.round(t.kcal), agua: t.agua, carbs: r1(t.carbs), fat: r1(t.fat) };
 }
 
 /**

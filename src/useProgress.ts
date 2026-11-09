@@ -8,6 +8,7 @@ import { computeSeasons, type SeasonState } from './game/season';
 import { computeBets } from './game/bets';
 import { coinsEarned, coinsSpent } from './game/shop';
 import { useStore, type Profile } from './store';
+import { duoAchievements, type DuoStats } from './game/duoAchievements';
 
 /** Metas de hoje. */
 export function goalsOf(p: Profile): DietGoals {
@@ -33,7 +34,7 @@ function extrasOf(p: Profile, joint: JointPair[]): XpEvent[] {
 
 /** Progresso de um perfil: treinos + XP extra. */
 export function progressOf(p: Profile, joint: JointPair[] = []): Progress {
-  return computeProgress(p.workouts, p.settings, new Date(), extrasOf(p, joint));
+  return computeProgress(p.workouts, p.settings, new Date(), extrasOf(p, joint), p.frozenWeeks ?? []);
 }
 
 /** Todos os eventos de XP com data (treinos + extras), para temporadas e retrospectiva. */
@@ -88,6 +89,15 @@ export function useGame() {
     [profiles, timelines, habits],
   );
 
+  const duoStats: DuoStats | null = useMemo(
+    () =>
+      duo
+        ? { joint: joint.length, bestCoupleStreak: duo.bestCoupleStreak, coupleWeeksTotal: duo.coupleWeeksTotal, raidsWon: duo.raidsWon, km: all[0].distanceTotal + (all[1]?.distanceTotal ?? 0) }
+        : null,
+    [duo, joint, all],
+  );
+  const duoDone = useMemo(() => (duoStats ? duoAchievements(duoStats) : []), [duoStats]);
+
   const coins = useMemo(() => {
     const p = profiles[me];
     const earned = coinsEarned({
@@ -98,9 +108,10 @@ export function useGame() {
       jointWorkouts: joint.length,
       seasonCoins: season?.coins[me] ?? 0,
       betCoins: bets.coins[me],
+      duoAchievements: duoDone.length,
     });
-    return { earned, balance: earned - coinsSpent(p.purchases ?? []) };
-  }, [profiles, all, duo, me, habits, joint, season, bets]);
+    return { earned, balance: earned - coinsSpent(p.purchases ?? [], p.frozenWeeks?.length ?? 0) };
+  }, [profiles, all, duo, me, habits, joint, season, bets, duoDone]);
 
   return {
     profiles,
@@ -110,6 +121,8 @@ export function useGame() {
     duo,
     coins,
     joint,
+    duoStats,
+    duoDone,
     season,
     bets,
     habits,

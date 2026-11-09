@@ -5,6 +5,7 @@
  * Tudo depende da sincronização (o código do grupo identifica o casal).
  */
 import { useStore } from './store';
+import type { Weekly } from '../push/src/reminder';
 
 /** Endereço do worker publicado. Vazio = notificações desligadas no app. */
 export const PUSH_URL = 'https://forja-push.vitorwessler.workers.dev';
@@ -117,6 +118,7 @@ export interface DayStatus {
   trained: boolean;
   habitsLeft: number;
   weekLeft: number;
+  weekly?: Weekly;
 }
 
 /** Manda o resumo do dia se mudou desde o último envio. */

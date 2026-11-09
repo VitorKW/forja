@@ -8,6 +8,7 @@ import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../ga
 import { currentProfile, useProfile, useStore } from '../store';
 import { notifyPartner } from '../push';
 import { LiveJointBoard } from '../components/JointBoard';
+import { BARBELL, BARS, NEEDS_WARMUP, platesFor, warmupFor } from '../game/gym';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -46,6 +47,9 @@ export default function WorkoutScreen() {
   const [distance, setDistance] = useState(0);
   const [rir, setRir] = useState<number | null>(2);
   const [warmup, setWarmup] = useState(false);
+  // Super-série: alterna entre dois exercícios e só descansa depois do par.
+  const [superset, setSuperset] = useState<{ a: Exercise; b: Exercise } | null>(null);
+  const [pickingPair, setPickingPair] = useState(false);
   const timer = useRest(active?.id ?? '');
   const stopRest = useCallback(() => timer.stop(), [timer.stop]); // eslint-disable-line react-hooks/exhaustive-deps
   const [floaters, setFloaters] = useState<{ id: number; text: string }[]>([]);
@@ -92,6 +96,16 @@ export default function WorkoutScreen() {
   const suggestion = exercise && !cardio && !slot ? suggestLoad(workouts, exercise.id) : null;
   const nextSlot = slot && slotDone(slot.exerciseId) >= slot.sets ? planSession?.slots.find((s) => slotDone(s.exerciseId) < s.sets) : undefined;
   const doneIds = new Set(active.sets.map((s) => s.exerciseId));
+  // Anilhas (só em kg e exercícios de barra) e aquecimento antes da primeira série de trabalho.
+  const bar = settings.barKg ?? 20;
+  const plates = exercise && !cardio && settings.unit === 'kg' && BARBELL.has(exercise.id) && weight >= bar ? platesFor(weight, bar) : null;
+  const lastWork = exercise
+    ? [...workouts.flatMap((w) => w.sets)].reverse().find((s) => s.exerciseId === exercise.id && !s.warmup)
+    : undefined;
+  const workTarget = target?.weight ?? suggestion?.weight ?? lastWork?.weight ?? 0;
+  const workReps = target?.reps ?? suggestion?.reps ?? lastWork?.reps ?? reps;
+  const hasWork = exercise ? active.sets.some((s) => s.exerciseId === exercise.id && !s.warmup) : true;
+  const warmups = exercise && !cardio && !hasWork && NEEDS_WARMUP.has(exercise.id) ? warmupFor(workTarget, BARBELL.has(exercise.id), bar) : [];
 
   const startTemplate = (t: Template) => {
     setQueue(t);
@@ -156,6 +170,23 @@ export default function WorkoutScreen() {
     }
     addSet({ exerciseId: exercise.id, weight, reps, rir: warmup ? null : rir, warmup });
     unlockSound();
+    // Aquecimento sugerido: passa para a próxima etapa e, no fim, volta para a carga de trabalho.
+    if (warmup && warmups.length) {
+      const next = warmups.find((s) => s.weight > weight);
+      if (next) {
+        setWeight(next.weight);
+        setReps(next.reps);
+      } else {
+        setWarmup(false);
+        setWeight(workTarget);
+        setReps(workReps);
+      }
+    }
+    if (superset && !warmup) {
+      // Primeiro exercício do par: vai direto para o segundo, sem descanso.
+      if (exercise.id === superset.a.id) return choose(superset.b);
+      if (exercise.id === superset.b.id) choose(superset.a);
+    }
     const rest = slot && !warmup ? slot.rest : restSeconds;
     timer.start(warmup ? Math.min(60, rest) : rest);
   };
@@ -222,7 +253,17 @@ export default function WorkoutScreen() {
             </div>
           </div>
         )}
-        {picking ? (
+        {pickingPair && exercise ? (
+          <ExercisePicker
+            onPick={(b) => {
+              if (b.id !== exercise.id && b.kind !== 'cardio') setSuperset({ a: exercise, b });
+              setPickingPair(false);
+            }}
+            onCancel={() => setPickingPair(false)}
+            templates={[]}
+            onTemplate={() => {}}
+          />
+        ) : picking ? (
           <ExercisePicker onPick={choose} onCancel={exercise ? () => setPicking(false) : undefined} templates={templates} onTemplate={startTemplate} />
         ) : (
           exercise && (
@@ -237,6 +278,23 @@ export default function WorkoutScreen() {
                 {ATTRIBUTE_LABEL[exercise.primary]}
                 {exercise.secondary && ` + ${ATTRIBUTE_LABEL[exercise.secondary]}`}
               </div>
+              {superset ? (
+                <div className="superset">
+                  <span>
+                    Super-série: <strong>{superset.a.name}</strong> ↔ <strong>{superset.b.name}</strong>
+                    <span className="muted small"> · descanso depois do par</span>
+                  </span>
+                  <button className="link small" onClick={() => setSuperset(null)}>
+                    Sair
+                  </button>
+                </div>
+              ) : (
+                !cardio && (
+                  <button className="link small" onClick={() => setPickingPair(true)}>
+                    + Super-série com outro exercício
+                  </button>
+                )
+              )}
 
               {cardio ? (
                 <>
@@ -278,10 +336,51 @@ export default function WorkoutScreen() {
                       <span className="link">Usar</span>
                     </button>
                   )}
+                  {warmups.length > 0 && (
+                    <div className="warmup-hint">
+                      <span className="field-label">Aquecimento sugerido até {fmt(workTarget)} {settings.unit}</span>
+                      <div className="recent-list">
+                        {warmups.map((s) => (
+                          <button
+                            key={s.weight}
+                            className="qchip"
+                            onClick={() => {
+                              setWeight(s.weight);
+                              setReps(s.reps);
+                              setWarmup(true);
+                            }}
+                          >
+                            <span className="num">{fmt(s.weight)} × {s.reps}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="steppers">
                     <Stepper label="Carga" value={weight} onChange={setWeight} step={2.5} suffix={settings.unit} />
                     <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={1} />
                   </div>
+                  {plates && (
+                    <div className="plates muted small">
+                      <span>
+                        {plates.perSide.length ? (
+                          <>
+                            Cada lado: <strong className="num">{plates.perSide.map((p) => fmt(p, 2)).join(' + ')}</strong>
+                          </>
+                        ) : (
+                          'Só a barra'
+                        )}
+                        {plates.left > 0 && ` (faltam ${fmt(plates.left, 2)} kg para fechar)`}
+                      </span>
+                      <select value={bar} onChange={(e) => updateSettings({ barKg: Number(e.target.value) })} aria-label="Peso da barra">
+                        {BARS.map((b) => (
+                          <option key={b} value={b}>
+                            barra {b} kg
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="field">
                     <span className="field-label">RIR (reps na reserva)</span>
                     <div className="chips">

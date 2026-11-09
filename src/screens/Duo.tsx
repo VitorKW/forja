@@ -3,6 +3,7 @@ import { fmt } from '../components/ui';
 import CheerButtons from '../components/CheerButtons';
 import { CHEERS } from '../game/extras';
 import { COINS } from '../game/shop';
+import { DUO_ACHIEVEMENTS, DUO_ACHIEVEMENT_COINS } from '../game/duoAchievements';
 import { dayKey, weekKey } from '../game/rules';
 import { JOINT } from '../game/duo';
 import { SEASON_TIERS, SEASON_WIN_COINS, tiersReached } from '../game/season';
@@ -26,7 +27,7 @@ function when(iso: string) {
 }
 
 export default function Duo() {
-  const { profiles, all, me, partner, duo, joint, season } = useGame();
+  const { profiles, all, me, partner, duo, joint, season, duoStats, duoDone } = useGame();
   if (!duo || !season) return null;
   const jointIds = new Set(joint.map((j) => (partner === 0 ? j.a : j.b)));
   const thisWeek = weekKey(new Date());
@@ -172,6 +173,40 @@ export default function Duo() {
           </p>
         </div>
       </motion.section>
+
+      {duoStats && (
+        <motion.section className="card" {...rise(3)}>
+          <div className="row between baseline">
+            <h2>Conquistas do casal</h2>
+            <span className="muted small">
+              {duoDone.length}/{DUO_ACHIEVEMENTS.length} · +{DUO_ACHIEVEMENT_COINS} moedas cada
+            </span>
+          </div>
+          <ul className="ach-list duo-ach">
+            {DUO_ACHIEVEMENTS.map((a) => {
+              const got = duoDone.includes(a.id);
+              const [v, max] = a.progress(duoStats);
+              return (
+                <li key={a.id} className={got ? 'got' : ''}>
+                  <span className="duo-ach-icon" aria-hidden>
+                    {got ? '🏅' : '○'}
+                  </span>
+                  <div className="grow">
+                    <strong>{a.name}</strong>
+                    <div className="muted small">{a.description}</div>
+                    {!got && (
+                      <div className="xpbar small" aria-label={`${Math.min(v, max)} de ${max}`}>
+                        <div className="fill" style={{ width: `${Math.min(100, (v / max) * 100)}%` }} />
+                      </div>
+                    )}
+                  </div>
+                  {!got && <span className="num muted small">{Math.min(v, max)}/{max}</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </motion.section>
+      )}
 
       <motion.section className="card" {...rise(4)}>
         <span className="eyebrow">Desafio da semana</span>

@@ -43,6 +43,8 @@ export interface Workout {
   startedAt: string; // ISO
   finishedAt: string | null; // ISO, null enquanto está em andamento
   deload: boolean;
+  /** Quando as séries foram corrigidas depois de terminar (a sincronização usa a mais recente). */
+  editedAt?: number;
   sets: SetEntry[];
   /** Sessão do programa periodizado que este treino cumpre. */
   plan?: { program: string; week: number; session: number };
@@ -53,6 +55,8 @@ export interface Settings {
   unit: 'kg' | 'lb';
   /** Descanso entre séries, em segundos (padrão 90). */
   restSeconds?: number;
+  /** Peso da barra para a conta das anilhas (padrão 20 kg). */
+  barKg?: number;
 }
 
 /** Ficha de treino: uma lista de exercícios para não ter que escolher um por um. */

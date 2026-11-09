@@ -268,7 +268,9 @@ const zeroAttrs = (): Record<Attribute, number> =>
   Object.fromEntries(ATTRIBUTES.map((a) => [a, 0])) as Record<Attribute, number>;
 
 /** extras: XP de missões e incentivos, encaixado na linha do tempo junto com os treinos. */
-export function computeProgress(workouts: Workout[], settings: Settings, now: Date = new Date(), extras: XpEvent[] = []): Progress {
+/** rozen: semanas congeladas na loja (não contam como cumpridas, mas não quebram a sequência). */
+export function computeProgress(workouts: Workout[], settings: Settings, now: Date = new Date(), extras: XpEvent[] = [], frozen: string[] = []): Progress {
+  const frozenSet = new Set(frozen);
   const done = workouts
     .filter((w): w is Workout & { finishedAt: string } => !!w.finishedAt)
     .sort((a, b) => a.finishedAt.localeCompare(b.finishedAt));
@@ -289,6 +291,8 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
       if (weekComplete(cursor)) {
         streak++;
         run++;
+      } else if (frozenSet.has(cursor)) {
+        // Congelada: a sequência fica como estava.
       } else {
         streak = Math.floor(streak / 2);
         run = 0;
@@ -485,4 +489,28 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
     results,
     weekSets: weekSetCount.get(currentWeek) ?? zeroAttrs(),
   };
+}
+
+// ---------- Congelar a sequência ----------
+
+export const FREEZE = { cost: 120, everyWeeks: 4 } as const;
+
+/**
+ * Oferta de congelamento: a semana passada ficou abaixo da meta e isso derrubou a
+ * constância. Uma vez a cada 4 semanas. Devolve null se não há o que salvar.
+ */
+export function freezeOffer(
+  workouts: Workout[],
+  settings: Settings,
+  frozen: string[] = [],
+  now: Date = new Date(),
+): { week: string; streakNow: number; streakIfFrozen: number } | null {
+  const thisWeek = weekKey(now);
+  const [y, m, d] = thisWeek.split('-').map(Number);
+  const last = dayKey(new Date(y, m - 1, d - 7));
+  if (frozen.includes(last) || weekStatus(workouts, settings.weeklyGoal).complete(last)) return null;
+  if (frozen.some((f) => weeksBetween(f, last) < FREEZE.everyWeeks)) return null;
+  const streakNow = computeProgress(workouts, settings, now, [], frozen).streak;
+  const streakIfFrozen = computeProgress(workouts, settings, now, [], [...frozen, last]).streak;
+  return streakIfFrozen > streakNow ? { week: last, streakNow, streakIfFrozen } : null;
 }
