@@ -1,7 +1,9 @@
-﻿# Servidor de notificações do Forja. Ver push/README.md.
+# Servidor de notificações do Forja. Ver push/README.md.
 name = "forja-push"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
+workers_dev = true
+preview_urls = false
 
 # Lembrete da noite: 23h UTC = 20h em Brasília.
 [triggers]
@@ -9,7 +11,7 @@ crons = ["0 23 * * *"]
 
 [[kv_namespaces]]
 binding = "FORJA"
-id = "COLOCAR_ID_DO_KV"
+id = "4eee120a3c26467b88e4dbe4e7c4e58b"
 
 [vars]
 VAPID_PUBLIC = "BAMOJSIp_M5DsOYZS-ewSD3SD6uLt7wDI9WDsMh5vq2MCkjrchuzZjQUZmRkPr1-7UNVX2sIVpSfqrNbGDcfNX0"

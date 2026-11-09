@@ -7,7 +7,7 @@
 import { useStore } from './store';
 
 /** Endereço do worker publicado. Vazio = notificações desligadas no app. */
-export const PUSH_URL = '';
+export const PUSH_URL = 'https://forja-push.vitorwessler.workers.dev';
 export const VAPID_PUBLIC = 'BAMOJSIp_M5DsOYZS-ewSD3SD6uLt7wDI9WDsMh5vq2MCkjrchuzZjQUZmRkPr1-7UNVX2sIVpSfqrNbGDcfNX0';
 
 const SLOT_KEY = 'forja-push-slot';
