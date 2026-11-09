@@ -7,7 +7,11 @@ import { heatColor } from '../heat';
 import { useStore } from '../store';
 import { useGame } from '../useProgress';
 import CheerButtons from '../components/CheerButtons';
-import { HABITS, HABIT_XP } from '../game/extras';
+import { activeMissions, HABIT_XP } from '../game/extras';
+import MissionsEditor from '../components/MissionsEditor';
+import ProgramCard from '../components/ProgramCard';
+import LiveCard from '../components/LiveCard';
+import { useState } from 'react';
 import BossSprite from '../components/BossSprite';
 import { monthKey, monthName, shiftMonth } from '../game/recap';
 
@@ -55,6 +59,9 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
   const openRecap = useStore((s) => s.openRecap);
   const { workouts, look } = profile;
   const toggleHabit = useStore((s) => s.toggleHabit);
+  const setMissions = useStore((s) => s.setMissions);
+  const [editMissions, setEditMissions] = useState(false);
+  const missions = activeMissions(profile.missions);
   const other = profiles[partner];
   // Treino mais recente do par nos últimos 3 dias, para incentivar.
   const partnerLast = other?.workouts
@@ -149,13 +156,32 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
         </div>
       </motion.section>
 
+      <motion.div {...rise(2)}>
+        <ProgramCard profile={profile} />
+      </motion.div>
+
       <motion.section className="card habits" {...rise(2)}>
         <div className="row between baseline">
           <h2>Missões de hoje</h2>
-          <span className="muted small">+{HABIT_XP} XP cada</span>
+          <span className="muted small">
+            +{HABIT_XP} XP cada ·{' '}
+            <button className="link small" onClick={() => setEditMissions((v) => !v)}>
+              {editMissions ? 'fechar' : 'editar'}
+            </button>
+          </span>
         </div>
+        {editMissions ? (
+          <MissionsEditor
+            value={profile.missions}
+            onClose={() => setEditMissions(false)}
+            onSave={(m) => {
+              setMissions(m);
+              setEditMissions(false);
+            }}
+          />
+        ) : (
         <div className="habit-list">
-          {HABITS.map((h) => {
+          {missions.map((h) => {
             const on = habitsToday.includes(h.id);
             const byDiet = on && !manualToday.includes(h.id);
             return (
@@ -177,7 +203,10 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
             );
           })}
         </div>
+        )}
       </motion.section>
+
+      <LiveCard />
 
       {partnerLast && (
         <motion.section className="card partner-card" {...rise(3)}>

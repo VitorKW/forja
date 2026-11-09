@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stepper, fmt } from '../components/ui';
 import RestTimer, { unlockSound, useRest } from '../components/RestTimer';
 import { EXERCISES, EXERCISE_BY_ID } from '../game/exercises';
-import { cardioXp, computeProgress, isSuspiciousWeight, suggestLoad } from '../game/rules';
+import { cardioXp, computeProgress, estimate1RM, isSuspiciousWeight, recordTarget, suggestLoad } from '../game/rules';
+import { buildProgram, loadTarget, prescription } from '../game/program';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
 import { currentProfile, useProfile, useStore } from '../store';
 import { notifyPartner } from '../push';
@@ -32,7 +33,7 @@ function mmss(sec: number) {
 }
 
 export default function WorkoutScreen() {
-  const { active, workouts, settings, templates = [] } = useProfile();
+  const { active, workouts, settings, templates = [], program } = useProfile();
   const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate, updateSettings } = useStore();
   const restSeconds = settings.restSeconds ?? 90;
   const [queue, setQueue] = useState<Template | null>(null);
@@ -71,11 +72,24 @@ export default function WorkoutScreen() {
     prevCount.current = count;
   }, [preview, active?.sets.length]);
 
+  // Sessão do programa periodizado, se este treino for uma.
+  const plan = active?.plan;
+  const planWeek = useMemo(() => (plan && program?.id === plan.program ? buildProgram(program)[plan.week - 1] : undefined), [plan, program]);
+  const planSession = plan ? planWeek?.sessions[plan.session] : undefined;
+  useEffect(() => {
+    if (planSession && !queue) startTemplate({ id: 'plano', name: `Programa · ${planSession.name}`, exercises: planSession.slots.map((s) => s.exerciseId) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planSession]);
+
   if (!active) return null;
 
   const elapsed = (now - new Date(active.startedAt).getTime()) / 1000;
   const cardio = exercise?.kind === 'cardio';
-  const suggestion = exercise && !cardio ? suggestLoad(workouts, exercise.id) : null;
+  const slot = exercise ? planSession?.slots.find((s) => s.exerciseId === exercise.id) : undefined;
+  const target = slot ? loadTarget(workouts, slot, !!planWeek?.deload) : null;
+  const slotDone = (id: string) => active.sets.filter((s) => s.exerciseId === id && !s.warmup).length;
+  const suggestion = exercise && !cardio && !slot ? suggestLoad(workouts, exercise.id) : null;
+  const nextSlot = slot && slotDone(slot.exerciseId) >= slot.sets ? planSession?.slots.find((s) => slotDone(s.exerciseId) < s.sets) : undefined;
   const doneIds = new Set(active.sets.map((s) => s.exerciseId));
 
   const startTemplate = (t: Template) => {
@@ -102,6 +116,17 @@ export default function WorkoutScreen() {
       setWeight(last?.weight ?? 20);
       setReps(last?.reps ?? 10);
     }
+    // No programa, já começa com a carga e as reps do dia.
+    const s = planSession?.slots.find((x) => x.exerciseId === ex.id);
+    if (s) {
+      const t = loadTarget(workouts, s, !!planWeek?.deload);
+      if (ex.kind === 'cardio') setReps(t.reps);
+      else {
+        if (t.weight !== null) setWeight(t.weight);
+        setReps(t.reps);
+        setRir(s.rir);
+      }
+    }
   };
 
   const register = () => {
@@ -113,9 +138,25 @@ export default function WorkoutScreen() {
       addSet({ exerciseId: exercise.id, weight: 0, reps, rir: null, warmup: false, ...(exercise.perKm && distance > 0 ? { distance } : {}) });
       return;
     }
+    // Recorde? Avisa o par (só se já havia uma marca para superar).
+    const est = warmup ? null : estimate1RM(weight, reps);
+    if (est) {
+      let best = 0;
+      for (const w of [...workouts, active])
+        for (const s of w.sets) if (s.exerciseId === exercise.id && !s.warmup) best = Math.max(best, estimate1RM(s.weight, s.reps) ?? 0);
+      if (best > 0 && est > recordTarget(best)) {
+        const st = useStore.getState();
+        notifyPartner(st.profiles.findIndex((p) => p.id === st.currentId), {
+          title: `${currentProfile(st).name} bateu recorde! 🏆`,
+          body: `${exercise.name}: ${fmt(weight)} kg × ${reps}.`,
+          tag: `recorde-${exercise.id}`,
+        });
+      }
+    }
     addSet({ exerciseId: exercise.id, weight, reps, rir: warmup ? null : rir, warmup });
     unlockSound();
-    timer.start(warmup ? Math.min(60, restSeconds) : restSeconds);
+    const rest = slot && !warmup ? slot.rest : restSeconds;
+    timer.start(warmup ? Math.min(60, rest) : rest);
   };
 
   const finish = () => {
@@ -210,6 +251,21 @@ export default function WorkoutScreen() {
                 </>
               ) : (
                 <>
+                  {slot && target && (
+                    <div className="plan-target">
+                      <div className="row between baseline">
+                        <span className="eyebrow">Meta do programa</span>
+                        <span className="num small">
+                          {Math.min(slotDone(slot.exerciseId), slot.sets)}/{slot.sets} séries
+                        </span>
+                      </div>
+                      <strong className="num">{prescription(slot)}</strong>
+                      <span className="muted small">
+                        {target.weight !== null ? `Hoje: ${fmt(target.weight)} ${settings.unit} × ${target.reps}. ` : ''}
+                        {target.note} Descanso {mmss(slot.rest)}.
+                      </span>
+                    </div>
+                  )}
                   {suggestion && (suggestion.weight !== weight || suggestion.reps !== reps) && (
                     <button className="suggest" onClick={() => { setWeight(suggestion.weight); setReps(suggestion.reps); }}>
                       <span>
@@ -246,9 +302,15 @@ export default function WorkoutScreen() {
                 </>
               )}
 
+              {cardio && slot && <p className="muted small">Meta do programa: {prescription(slot)} em ritmo forte.</p>}
               <button className="primary big" onClick={register}>
                 {cardio ? 'Registrar atividade' : 'Registrar série'}
               </button>
+              {nextSlot && EXERCISE_BY_ID[nextSlot.exerciseId] && (
+                <button className="ghost" onClick={() => choose(EXERCISE_BY_ID[nextSlot.exerciseId])}>
+                  Próximo: {EXERCISE_BY_ID[nextSlot.exerciseId].name} →
+                </button>
+              )}
             </section>
           )
         )}

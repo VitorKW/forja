@@ -92,9 +92,21 @@ export async function testPush(group: string, slot: 0 | 1): Promise<{ sent: numb
 
 /** Avisa o par (não faz nada sem sincronização). Falhas são ignoradas: é só um aviso. */
 export function notifyPartner(meSlot: number, msg: { title: string; body: string; tag?: string }) {
-  const group = useStore.getState().syncCode;
-  if (!PUSH_URL || !group) return;
+  const { syncCode: group, demo } = useStore.getState();
+  if (!PUSH_URL || !group || demo) return;
   post('/notify', { group, slot: meSlot === 0 ? 1 : 0, ...msg }).catch(() => undefined);
+}
+
+/** Avisa o par que um treino começou (convite para treinar junto). */
+export function notifyStart(session?: string) {
+  const s = useStore.getState();
+  const i = s.profiles.findIndex((p) => p.id === s.currentId);
+  const name = s.profiles[i]?.name ?? '';
+  notifyPartner(i, {
+    title: `${name} começou a treinar${session ? `: ${session}` : ''}`,
+    body: 'Treinando junto (até 2 h de diferença) vale +30 XP e +10 moedas para cada um.',
+    tag: 'comecou',
+  });
 }
 
 export interface DayStatus {

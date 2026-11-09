@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { HABIT_IDS } from '../game/extras';
+import { activeMissions } from '../game/extras';
 import { dayKey, weekKey } from '../game/rules';
 import { disablePush, enablePush, pushSlot, pushSupport, sendStatus, testPush } from '../push';
 import { useStore } from '../store';
@@ -96,7 +96,7 @@ export function PushPanel() {
 
 /** Manda ao servidor o resumo do dia de quem recebe os lembretes neste celular. */
 export function PushStatusReporter() {
-  const code = useStore((s) => s.syncCode);
+  const code = useStore((s) => (s.demo ? null : s.syncCode));
   const slot = pushSlot();
   if (!code || slot === null || pushSupport() !== 'ok') return null;
   return <Reporter code={code} slot={slot} />;
@@ -114,7 +114,7 @@ function Reporter({ code, slot }: { code: string; slot: 0 | 1 }) {
     week: weekKey(now),
     tz: now.getTimezoneOffset(),
     trained: p.workouts.some((w) => w.finishedAt && dayKey(new Date(w.finishedAt)) === today),
-    habitsLeft: HABIT_IDS.filter((h) => !habits[slot][today]?.includes(h)).length,
+    habitsLeft: activeMissions(p.missions).filter((h) => !habits[slot][today]?.includes(h.id)).length,
     weekLeft: Math.max(0, prog.week.goal - prog.week.days),
   };
   const key = JSON.stringify(status);

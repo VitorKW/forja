@@ -42,6 +42,8 @@ export interface Workout {
   finishedAt: string | null; // ISO, null enquanto está em andamento
   deload: boolean;
   sets: SetEntry[];
+  /** Sessão do programa periodizado que este treino cumpre. */
+  plan?: { program: string; week: number; session: number };
 }
 
 export interface Settings {

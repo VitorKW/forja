@@ -9,6 +9,8 @@ import Profile from './screens/Profile';
 import Duo from './screens/Duo';
 import Diet from './screens/Diet';
 import Recap from './screens/Recap';
+import Welcome from './screens/Welcome';
+import { notifyStart } from './push';
 import { Icon } from './components/ui';
 import { PushStatusReporter } from './components/PushPanel';
 
@@ -49,7 +51,10 @@ function ProfileSwitch() {
 
 /** Liga a sincronização quando há um código; o Firebase só é baixado nesse caso. */
 function useSync() {
-  const code = useStore((s) => s.syncCode);
+  const real = useStore((s) => s.syncCode);
+  const demo = useStore((s) => !!s.demo);
+  // No modo demonstração nada vai para a nuvem.
+  const code = demo ? null : real;
   const setStatus = useStore((s) => s.setSyncStatus);
   useEffect(() => {
     if (!code) {
@@ -77,14 +82,27 @@ export default function App() {
   const summaryId = useStore((s) => s.summaryId);
   const startWorkout = useStore((s) => s.startWorkout);
   const recapMonth = useStore((s) => s.recapMonth);
+  const onboarded = useStore((s) => s.onboarded);
+  const demo = useStore((s) => !!s.demo);
+  const exitDemo = useStore((s) => s.exitDemo);
+  const openDemo = () => import('./demo').then((m) => useStore.getState().enterDemo(m.demoProfiles()));
 
   let content;
-  if (active) content = <WorkoutScreen key="treino" />;
+  if (!onboarded && !demo) content = <Welcome key="boas-vindas" onDemo={openDemo} />;
+  else if (active) content = <WorkoutScreen key="treino" />;
   else if (summaryId) content = <Summary key={`resumo-${summaryId}`} workoutId={summaryId} />;
   else if (recapMonth) content = <Recap month={recapMonth} />;
   else
     content = (
       <div className="app" key="abas">
+        {demo && (
+          <div className="demo-bar">
+            <span>Modo demonstração: nada aqui é salvo.</span>
+            <button className="link small" onClick={exitDemo}>
+              Sair
+            </button>
+          </div>
+        )}
         <header className="topbar">
           <ProfileSwitch />
         </header>
@@ -117,7 +135,10 @@ export default function App() {
               );
             })}
           </nav>
-          <motion.button className="fab" onClick={startWorkout} whileTap={{ scale: 0.92 }} aria-label="Começar treino">
+          <motion.button className="fab" onClick={() => {
+              startWorkout();
+              notifyStart();
+            }} whileTap={{ scale: 0.92 }} aria-label="Começar treino">
             <Icon name="forja" />
             <span className="fab-label">Treinar</span>
           </motion.button>
@@ -130,7 +151,7 @@ export default function App() {
       <PushStatusReporter />
       <AnimatePresence mode="wait">
         <motion.div
-          key={active ? 'treino' : summaryId ? 'resumo' : recapMonth ? 'retro' : 'abas'}
+          key={!onboarded && !demo ? 'boas-vindas' : active ? 'treino' : summaryId ? 'resumo' : recapMonth ? 'retro' : 'abas'}
           // Só opacidade: transform aqui quebraria o position: fixed da barra de baixo.
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

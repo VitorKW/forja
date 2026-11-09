@@ -259,6 +259,9 @@ export default function Profile() {
             <option value="lb">lb</option>
           </select>
         </label>
+        <button className="ghost" onClick={() => import('../demo').then((m) => useStore.getState().enterDemo(m.demoProfiles()))}>
+          Ver modo demonstração
+        </button>
         <button
           className="ghost danger"
           onClick={() => confirm(`Apagar todos os treinos e o progresso de ${name}? Isso não pode ser desfeito.`) && resetCurrent()}

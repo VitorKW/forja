@@ -22,10 +22,11 @@ const player = (name: string, workouts: Workout[], xp = 100): DuoPlayer => ({ na
 const NOW = new Date('2026-11-11T12:00:00'); // quarta-feira; semana começa em 09/11
 
 describe('missões e incentivos', () => {
-  it('cada missão vale XP no dia, e missões desconhecidas são ignoradas', () => {
-    const ev = habitEvents({ '2026-11-09': ['agua', 'sono'], '2026-11-10': ['xyz' as never] });
-    expect(ev).toHaveLength(1);
+  it('cada missão vale XP no dia (inclusive as criadas pela pessoa)', () => {
+    const ev = habitEvents({ '2026-11-09': ['agua', 'sono'], '2026-11-10': ['c-flexoes'] });
+    expect(ev).toHaveLength(2);
     expect(ev[0].xp).toBe(2 * HABIT_XP);
+    expect(ev[1].xp).toBe(HABIT_XP);
     expect(fullHabitDays({ '2026-11-09': ['agua', 'sono', 'proteina'], '2026-11-10': ['agua'] })).toBe(1);
   });
 

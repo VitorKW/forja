@@ -6,6 +6,8 @@ import type { ItemKind } from './game/shop';
 import { compactDiet, type DietEntry, type DietGoals, type DietLog } from './game/diet';
 import { dayKey } from './game/rules';
 import type { Bet, BetAnswer } from './game/bets';
+import type { MissionConfig } from './game/extras';
+import type { ProgramConfig } from './game/program';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -38,6 +40,21 @@ export interface Profile {
   bets?: Bet[];
   /** Respostas deste perfil às apostas do par. */
   betAnswers?: Record<string, BetAnswer>;
+  /** Programa periodizado em andamento. */
+  program?: ProgramConfig | null;
+  /** Missões escolhidas (sem isso: proteína, água e sono). */
+  missions?: MissionConfig;
+  /** Treino acontecendo agora, para o par acompanhar. */
+  live?: LiveInfo | null;
+}
+
+/** Resumo do treino em andamento que vai para a nuvem. */
+export interface LiveInfo {
+  id: string;
+  startedAt: string;
+  sets: number;
+  session?: string;
+  last?: { exerciseId: string; weight: number; reps: number; at: string };
 }
 
 /** Dados de perfil que vêm da nuvem. */
@@ -55,10 +72,13 @@ export interface RemoteMeta {
   dietGoals?: DietGoals;
   bets?: Bet[];
   betAnswers?: Record<string, BetAnswer>;
+  program?: ProgramConfig | null;
+  missions?: MissionConfig;
+  live?: LiveInfo | null;
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'bets', 'betAnswers'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'bets', 'betAnswers', 'program', 'missions', 'live'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -74,7 +94,10 @@ export function metaOf(p: Profile): RemoteMeta {
     dietLog: p.dietLog ?? {},
     bets: p.bets ?? [],
     betAnswers: p.betAnswers ?? {},
+    program: p.program ?? null,
+    live: p.live ?? null,
     ...(p.dietGoals ? { dietGoals: p.dietGoals } : {}),
+    ...(p.missions ? { missions: p.missions } : {}),
   };
 }
 
@@ -109,7 +132,17 @@ interface State {
   renameProfile: (id: string, name: string) => void;
   setLook: (id: string, look: Look) => void;
 
-  startWorkout: () => void;
+  /** Começa um treino; com `plan`, é uma sessão do programa (e `deload` vem da semana). */
+  startWorkout: (plan?: { program: string; week: number; session: number; name: string; deload: boolean }) => void;
+  setProgram: (p: ProgramConfig | null) => void;
+  setMissions: (m: MissionConfig) => void;
+  /** Primeira abertura: nomes, visual e meta. */
+  onboarded: boolean;
+  finishOnboarding: (a: { me: string; look: Look; partner: string; weeklyGoal: number }) => void;
+  /** Modo demonstração: guarda os dados reais e mostra dados de exemplo (nada é salvo nem sincronizado). */
+  demo: { profiles: Profile[]; currentId: string } | null;
+  enterDemo: (profiles: Profile[]) => void;
+  exitDemo: () => void;
   addSet: (s: Omit<SetEntry, 'id'>) => void;
   removeSet: (id: string) => void;
   setDeload: (deload: boolean) => void;
@@ -178,20 +211,66 @@ export const useStore = create<State>()(
         setLook: (id, look) =>
           set({ profiles: get().profiles.map((p) => (p.id === id ? { ...p, look, metaAt: Date.now() } : p)) }),
 
-        startWorkout: () =>
-          update(() => ({ active: { id: uid(), startedAt: new Date().toISOString(), finishedAt: null, deload: false, sets: [] } })),
-        addSet: (s) => update((p) => (p.active ? { active: { ...p.active, sets: [...p.active.sets, { ...s, id: uid() }] } } : {})),
+        startWorkout: (plan) =>
+          update(() => {
+            const active: Workout = {
+              id: uid(),
+              startedAt: new Date().toISOString(),
+              finishedAt: null,
+              deload: plan?.deload ?? false,
+              sets: [],
+              ...(plan ? { plan: { program: plan.program, week: plan.week, session: plan.session } } : {}),
+            };
+            return { active, live: { id: active.id, startedAt: active.startedAt, sets: 0, ...(plan ? { session: plan.name } : {}) }, metaAt: Date.now() };
+          }),
+        setProgram: (program) => update(() => ({ program, metaAt: Date.now() })),
+        setMissions: (missions) => update(() => ({ missions, metaAt: Date.now() })),
+        onboarded: false,
+        finishOnboarding: ({ me, look, partner, weeklyGoal }) => {
+          const [a, b] = get().profiles;
+          const now = Date.now();
+          set({
+            onboarded: true,
+            profiles: [
+              { ...a, name: me.trim() || a.name, look, settings: { ...a.settings, weeklyGoal }, metaAt: now },
+              { ...b, name: partner.trim() || b.name, look: look === 'a' ? 'b' : 'a', metaAt: now },
+              ...get().profiles.slice(2),
+            ],
+            currentId: a.id,
+          });
+        },
+        demo: null,
+        enterDemo: (profiles) => {
+          const s = get();
+          if (s.demo) return;
+          set({ demo: { profiles: s.profiles, currentId: s.currentId }, profiles, currentId: profiles[0].id, summaryId: null, recapMonth: null });
+        },
+        exitDemo: () => {
+          const d = get().demo;
+          if (d) set({ profiles: d.profiles, currentId: d.currentId, demo: null, summaryId: null, recapMonth: null });
+        },
+        addSet: (s) =>
+          update((p) => {
+            if (!p.active) return {};
+            const at = new Date().toISOString();
+            const sets = [...p.active.sets, { ...s, id: uid() }];
+            return {
+              active: { ...p.active, sets },
+              live: { id: p.active.id, startedAt: p.active.startedAt, session: p.live?.session, sets: sets.length, last: { exerciseId: s.exerciseId, weight: s.weight, reps: s.reps, at } },
+              metaAt: Date.now(),
+            };
+          }),
         removeSet: (id) => update((p) => (p.active ? { active: { ...p.active, sets: p.active.sets.filter((s) => s.id !== id) } } : {})),
         setDeload: (deload) => update((p) => (p.active ? { active: { ...p.active, deload } } : {})),
         finishWorkout: () => {
           const p = currentProfile(get());
           if (!p.active) return;
-          if (p.active.sets.length === 0) return update(() => ({ active: null }));
+          if (p.active.sets.length === 0) return update(() => ({ active: null, live: null, metaAt: Date.now() }));
           const done = { ...p.active, finishedAt: new Date().toISOString() };
-          update((q) => ({ workouts: [...q.workouts, done], active: null }));
+          update((q) => ({ workouts: [...q.workouts, done], active: null, live: null, metaAt: Date.now() }));
           set({ summaryId: done.id });
         },
-        discardWorkout: () => update(() => ({ active: null })),
+        discardWorkout: () => update(() => ({ active: null, live: null, metaAt: Date.now() })),
         closeSummary: () => set({ summaryId: null }),
         openSummary: (id) => set({ summaryId: id }),
         deleteWorkout: (id) =>
@@ -299,8 +378,10 @@ export const useStore = create<State>()(
     },
     {
       name: 'forja-v1',
-      version: 2,
-      partialize: ({ profiles, currentId, syncCode }) => ({ profiles, currentId, syncCode }),
+      version: 3,
+      // No modo demonstração, o que fica salvo continua sendo o real.
+      partialize: ({ profiles, currentId, syncCode, onboarded, demo }) =>
+        demo ? { profiles: demo.profiles, currentId: demo.currentId, syncCode, onboarded } : { profiles, currentId, syncCode, onboarded },
       migrate: (persisted, version) => {
         let s = persisted as { profiles: Profile[]; currentId: string; syncCode?: string | null };
         // Versão 0 tinha um perfil só: ele vira o primeiro perfil, e o segundo nasce vazio.
@@ -326,6 +407,8 @@ export const useStore = create<State>()(
             })),
           };
         }
+        // Versão 3: quem já usava o app não vê a tela de boas-vindas.
+        if (version < 3) s = { ...s, onboarded: true } as typeof s;
         return s;
       },
     },

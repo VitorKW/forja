@@ -538,3 +538,40 @@ p { margin: 6px 0; }
 .push-state { display: flex; align-items: center; gap: 8px; }
 .backup-row { display: flex; gap: 8px; }
 .backup-row > * { flex: 1; }
+
+/* v0.9: programa, missões, ao vivo, boas-vindas, demonstração */
+.program h2 { display: flex; align-items: center; gap: 8px; }
+.deload-tag { color: var(--rest); background: #5ee0a81a; }
+.plan-weeks { list-style: none; display: flex; gap: 4px; padding: 0; margin: 4px 0 12px; }
+.plan-weeks li { flex: 1; height: 6px; border-radius: 99px; background: #ffffff14; }
+.plan-weeks li.done { background: var(--ember); }
+.plan-weeks li.now { background: var(--grad); box-shadow: 0 0 10px #ff8a1f88; }
+.plan-sessions { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.plan-sessions li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--well); border: 1px solid var(--line); }
+.plan-sessions li .check { width: 18px; height: 18px; border-radius: 6px; border: 2px solid var(--line-hi); flex-shrink: 0; }
+.plan-sessions li.done { opacity: 0.6; }
+.plan-sessions li.done .check { border-color: transparent; background: var(--rest); }
+.plan-sessions li.next { border-color: #ff8a1f55; }
+.plan-preview { margin-top: 10px; }
+.plan-preview ul { list-style: none; padding: 0; margin: 4px 0 0; }
+.plan-preview li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 0.88rem; border-bottom: 1px solid var(--line); }
+.plan-target { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; margin: 10px 0; border-radius: var(--r-sm); background: #ff8a1f12; border: 1px solid #ff8a1f33; }
+.plan-target strong { font-size: 1.3rem; }
+
+.missions-editor { display: flex; flex-direction: column; gap: 10px; }
+.mission-pick { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.mission-pick li { display: flex; align-items: center; gap: 6px; }
+.mission-pick .habit { flex: 1; }
+.mission-pick .habit:disabled { opacity: 0.4; }
+
+.live-card { border-color: #5ee0a844; background: linear-gradient(135deg, #0f2a20cc, var(--surface)); }
+.live-card h2 { margin: 6px 0 2px; }
+.live-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rest); }
+
+.demo-bar { position: sticky; top: 0; z-index: 40; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: #2b0b02; background: var(--grad); }
+.demo-bar .link { color: #2b0b02; text-decoration: underline; }
+
+.welcome { padding-top: 24px; }
+.welcome-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.welcome-hero h1 { font-size: 2.6rem; }
+.welcome-char { margin: 12px 0 4px; filter: drop-shadow(0 18px 30px #ff8a1f33); }

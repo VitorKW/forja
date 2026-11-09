@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { computeDuo, JOINT, jointWorkouts, type DuoState, type JointPair } from './game/duo';
 import { defaultGoals, dietHabits, mergeHabits, type DietGoals } from './game/diet';
-import { cheerEvents, fullHabitDays, habitEvents, type HabitLog, type XpEvent } from './game/extras';
+import { activeMissions, cheerEvents, fullHabitDays, habitEvents, type HabitLog, type XpEvent } from './game/extras';
 import { computeProgress, type Progress } from './game/rules';
 import { computeSeasons, type SeasonState } from './game/season';
 import { computeBets } from './game/bets';
@@ -14,7 +14,14 @@ export function goalsOf(p: Profile): DietGoals {
 
 /** Missões do perfil: as marcadas à mão mais as cumpridas pela dieta. */
 export function habitsOf(p: Profile): HabitLog {
-  return mergeHabits(p.habits ?? {}, dietHabits(p.dietLog ?? {}, goalsOf(p)));
+  // A dieta só marca proteína e água se elas estiverem entre as missões escolhidas.
+  const ids = new Set(activeMissions(p.missions).map((m) => m.id));
+  const diet = Object.fromEntries(
+    Object.entries(dietHabits(p.dietLog ?? {}, goalsOf(p)))
+      .map(([d, hs]) => [d, hs.filter((h) => ids.has(h))] as const)
+      .filter(([, hs]) => hs.length),
+  );
+  return mergeHabits(p.habits ?? {}, diet);
 }
 
 /** XP de fora dos treinos: missões, incentivos e bônus de treino junto. */

@@ -3,7 +3,7 @@
  */
 import { EXERCISE_BY_ID } from './exercises';
 import type { Cheer, HabitLog, XpEvent } from './extras';
-import { HABIT_IDS } from './extras';
+import { MAX_MISSIONS, MIN_MISSIONS } from './extras';
 import { dayKey, estimate1RM } from './rules';
 import type { Workout } from './types';
 import type { JointPair } from './duo';
@@ -130,8 +130,8 @@ export function computeRecap(month: string, input: RecapInput): Recap {
     records,
     topExercise: top ? { exerciseId: top[0], sets: top[1] } : null,
     favoriteWeekday: maxDay > 0 ? WEEKDAYS[weekdayCount.indexOf(maxDay)] : null,
-    missions: habitDays.reduce((s, [, ids]) => s + ids.filter((id) => HABIT_IDS.includes(id)).length, 0),
-    fullMissionDays: habitDays.filter(([, ids]) => HABIT_IDS.every((h) => ids.includes(h))).length,
+    missions: habitDays.reduce((s, [, ids]) => s + Math.min(MAX_MISSIONS, new Set(ids).size), 0),
+    fullMissionDays: habitDays.filter(([, ids]) => new Set(ids).size >= MIN_MISSIONS).length,
     joint: input.joint.filter((p) => p.at >= start && p.at < end).length,
     cheers: input.cheers.filter((c) => inMonth(c.at)).length,
   };
