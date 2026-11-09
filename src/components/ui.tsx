@@ -64,7 +64,7 @@ export function fmt(n: number, digits = 1) {
 }
 
 /** Ícones desenhados para a navegação (no lugar de emoji). */
-export function Icon({ name }: { name: 'forja' | 'dupla' | 'chefes' | 'perfil' }) {
+export function Icon({ name }: { name: 'forja' | 'dupla' | 'dieta' | 'chefes' | 'perfil' }) {
   const common = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const, 'aria-hidden': true };
   if (name === 'forja')
     return (
@@ -79,6 +79,13 @@ export function Icon({ name }: { name: 'forja' | 'dupla' | 'chefes' | 'perfil' }
         <circle cx="8.5" cy="8" r="3" />
         <circle cx="15.5" cy="8" r="3" />
         <path d="M3 19c0-3 2.5-5 5.5-5 1.4 0 2.6.4 3.5 1.1.9-.7 2.1-1.1 3.5-1.1 3 0 5.5 2 5.5 5" />
+      </svg>
+    );
+  if (name === 'dieta')
+    return (
+      <svg {...common}>
+        <path d="M12 7c-1.5-1.6-4.5-2-6.2-.2C3.6 9 4.4 14 6.8 17.4 8.3 19.6 10 20.6 12 19.6c2 1 3.7 0 5.2-2.2 2.4-3.4 3.2-8.4 1-10.6C16.5 5 13.5 5.4 12 7z" />
+        <path d="M12 7c0-2 1-3.5 3-4" />
       </svg>
     );
   if (name === 'chefes')

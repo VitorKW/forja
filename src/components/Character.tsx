@@ -26,6 +26,25 @@ function tier(level: number): Material | null {
 export const TIER_NAME = (level: number) =>
   level >= 8 ? 'de ouro' : level >= 6 ? 'em brasa' : level >= 4 ? 'de aço' : level >= 2 ? 'de couro' : null;
 
+/** Camadas do personagem (nomes dos sprites), de trás para a frente. */
+export function characterLayers(levels: Record<Attribute, number>, playerLevel: number, look: Look, capa?: string): string[] {
+  const gear = (piece: string, level: number) => {
+    const mat = tier(level);
+    return mat ? `${piece}_${mat}` : null;
+  };
+  return [
+    capa ? `capa_${capa}` : gear('capa', levels.folego),
+    `corpo_${look}`,
+    gear('grevas', levels.pernas),
+    gear('peitoral', levels.core),
+    gear('manoplas', levels.puxar),
+    gear('ombreiras', levels.empurrar),
+    // Elmo só em metal (aço, depois ouro): couro e brasa se confundem com cabelo.
+    playerLevel >= 5 ? (playerLevel >= 8 ? 'elmo_ouro' : 'elmo_aco') : null,
+    playerLevel >= 10 ? 'coroa' : null,
+  ].filter((l): l is string => l !== null);
+}
+
 export default function Character({
   levels,
   playerLevel,
@@ -46,21 +65,7 @@ export default function Character({
   // Mantém o tamanho na tela do desenho antigo (24 unidades de largura), em pixels inteiros.
   const px = Math.max(1, Math.round((24 * scale) / W));
 
-  const gear = (piece: string, level: number) => {
-    const mat = tier(level);
-    return mat ? `${piece}_${mat}` : null;
-  };
-  const layers = [
-    capa ? `capa_${capa}` : gear('capa', levels.folego),
-    `corpo_${look}`,
-    gear('grevas', levels.pernas),
-    gear('peitoral', levels.core),
-    gear('manoplas', levels.puxar),
-    gear('ombreiras', levels.empurrar),
-    // Elmo só em metal (aço, depois ouro): couro e brasa se confundem com cabelo.
-    playerLevel >= 5 ? (playerLevel >= 8 ? 'elmo_ouro' : 'elmo_aco') : null,
-    playerLevel >= 10 ? 'coroa' : null,
-  ].filter((l): l is string => l !== null);
+  const layers = characterLayers(levels, playerLevel, look, capa);
 
   const aura = levels.folego >= 6 || playerLevel >= 8;
   const glow = heatColor(Math.min(10, Math.max(levels.folego, playerLevel)));

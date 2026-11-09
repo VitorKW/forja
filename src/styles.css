@@ -129,7 +129,7 @@ p { margin: 6px 0; }
   width: calc(100% - 24px); max-width: 496px; z-index: 20; display: flex; gap: 10px; align-items: center;
 }
 .tabbar {
-  flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px; gap: 2px;
+  flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px; gap: 2px;
   background: #1a1512d9; backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
   border: 1px solid var(--line-hi); border-radius: 26px; box-shadow: 0 20px 40px -14px #000, inset 0 1px 0 #ffffff12;
 }
@@ -428,3 +428,73 @@ p { margin: 6px 0; }
 .chart-tip { position: absolute; transform: translate(-50%, -130%); pointer-events: none; white-space: nowrap; padding: 5px 9px; border-radius: 8px; background: #2c241e; border: 1px solid var(--line-hi); color: var(--text); font-size: 0.8rem; font-weight: 700; box-shadow: 0 6px 16px -6px #000; }
 .chart-head { margin-top: 10px; }
 .mini-select { background: var(--well); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: 0.85rem; max-width: 55%; }
+
+/* ---------- v0.7: dieta, temporada, treino junto, retrospectiva ---------- */
+/* Doca com 5 abas: o botão Treinar vira um bloco compacto. */
+.fab { width: 66px; padding: 0; flex-direction: column; justify-content: center; gap: 2px; }
+.fab .fab-label { font-size: 0.72rem; font-family: var(--body); font-weight: 800; }
+.tabbar button { font-size: 0.68rem; }
+@media (min-width: 420px) { .fab { width: auto; padding: 0 20px; flex-direction: row; gap: 8px; } .fab .fab-label { font-size: 1.05rem; font-family: var(--display); } }
+
+.meter { margin-top: 10px; }
+.meter-label { font-weight: 700; }
+.meter .num { font-size: 1.1rem; }
+.meter-track { height: 12px; margin-top: 6px; border-radius: 99px; background: var(--well); overflow: hidden; box-shadow: inset 0 1px 2px #000a; }
+.meter-fill { height: 100%; border-radius: 99px; }
+.meter-fill.protein { background: linear-gradient(90deg, #ffd166, var(--ember)); }
+.meter-fill.water { background: linear-gradient(90deg, #7fd4ff, #3a9bff); }
+.meter-fill.kcal { background: linear-gradient(90deg, #ffb3c7, var(--p1)); }
+.meter-fill.p1.protein, .meter-fill.p1.water { filter: saturate(0.85); }
+.meter.done .meter-label::after { content: ' ✓'; color: var(--rest); }
+.goals-form { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 12px; }
+.goals-form .link { align-self: flex-start; padding-left: 0; }
+
+.food-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.food { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px 8px; border-radius: 14px; background: var(--well); border: 1px solid var(--line); transition: border-color 0.2s, background 0.2s; }
+.food-icon { font-size: 1.5rem; line-height: 1.2; }
+.food-name { font-size: 0.72rem; font-weight: 700; line-height: 1.15; text-align: center; min-height: 2.3em; display: flex; align-items: center; }
+.food-p { font-size: 0.8rem; color: var(--gold); }
+.food.flash, .water.flash { border-color: #5ee0a8aa; background: #0f2a20; }
+.water-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.water { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 8px; border-radius: 14px; background: #0f1a24; border: 1px solid #3a9bff33; font-weight: 700; font-size: 0.9rem; transition: border-color 0.2s, background 0.2s; }
+.water .num { color: #7fd4ff; font-size: 0.85rem; }
+.custom-food { margin-top: 10px; }
+.custom-food summary { cursor: pointer; color: var(--gold); font-weight: 700; padding: 6px 0; }
+.custom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.custom-grid > :first-child { grid-column: 1 / -1; }
+.custom-grid .primary { grid-column: 1 / -1; }
+.habit:disabled { cursor: default; opacity: 1; }
+.habit-tag { margin-left: auto; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; color: var(--rest); background: #5ee0a81a; white-space: nowrap; }
+
+.season { background: radial-gradient(90% 70% at 100% 0%, #3a2a0e 0%, var(--surface) 60%); border-color: #ffc24a2e; }
+.season-name { font-size: 1.5rem; margin: 2px 0 8px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tiers { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0; margin: 12px 0 8px; position: relative; }
+.tiers::before { content: ''; position: absolute; left: 12.5%; right: 12.5%; top: 7px; height: 2px; background: var(--line-hi); }
+.tiers li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tier-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--well); border: 2px solid var(--line-hi); }
+.tiers li.on .tier-dot { background: var(--gold); border-color: transparent; box-shadow: 0 0 10px #ffc24a99; }
+.trophies { list-style: none; padding: 0; margin: 8px 0 0; }
+.trophies li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.joint { display: flex; gap: 16px; align-items: center; }
+.joint h2 { margin: 0 0 2px; }
+.joint-badge { margin-left: 8px; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 99px; color: #2b0b02; background: linear-gradient(135deg, var(--p0), var(--p1)); vertical-align: 2px; }
+
+.recap-teaser { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; background: linear-gradient(135deg, #3a1a0e, var(--surface) 70%); border-color: #ff8a1f33; }
+.recap-teaser strong { font-family: var(--display); font-size: 1.15rem; }
+.recap-top { display: flex; align-items: center; justify-content: space-between; }
+.month-nav { display: flex; gap: 4px; }
+.month-nav .icon-btn { font-size: 1.6rem; color: var(--text); background: var(--well); }
+.month-nav .icon-btn:disabled { opacity: 0.3; }
+.recap-card { background: radial-gradient(100% 60% at 80% 0%, #4a1f0c 0%, var(--surface) 70%); border-color: #ff8a1f33; }
+.recap-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.recap-head h1 { font-size: 2rem; }
+.recap-head .character { flex-shrink: 0; }
+.recap-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.recap-stat { display: flex; flex-direction: column; padding: 12px 14px; border-radius: 16px; background: #0d0b0acc; border: 1px solid var(--line); }
+.recap-stat .num { font-size: 1.7rem; line-height: 1.1; }
+.grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.recap-list { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.recap-list li { position: relative; padding-left: 20px; font-weight: 600; }
+.recap-list li::before { content: ''; position: absolute; left: 2px; top: 0.5em; width: 9px; height: 9px; border-radius: 50%; background: var(--grad); }
+.versus { padding: 6px 0; border-top: 1px solid var(--line); }
+.versus:first-of-type { border-top: 0; }

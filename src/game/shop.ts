@@ -12,6 +12,7 @@ export const COINS = {
   challenge: 30,
   coupleWeek: 20,
   habitDay: 5,
+  joint: 10,
 } as const;
 
 export type ItemKind = 'capa' | 'pet';
@@ -43,10 +44,15 @@ export interface CoinSources {
   fullHabitDays: number;
   /** Índice do jogador na dupla (0 ou 1), ou null sem dupla. */
   duo: { state: DuoState; me: 0 | 1 } | null;
+  /** Treinos feitos junto com o par. */
+  jointWorkouts?: number;
+  /** Moedas de temporada (marcos e troféus). */
+  seasonCoins?: number;
 }
 
 export function coinsEarned(s: CoinSources): number {
   let c = s.bossesDefeated * COINS.boss + s.achievements * COINS.achievement + s.fullHabitDays * COINS.habitDay;
+  c += (s.jointWorkouts ?? 0) * COINS.joint + (s.seasonCoins ?? 0);
   if (s.duo) {
     c += s.duo.state.raidsWon * COINS.raid;
     c += s.duo.state.challengeWins[s.duo.me] * COINS.challenge;

@@ -94,6 +94,49 @@ export function challengeValue(id: ChallengeId, workouts: Workout[]): number {
   return Math.round(v * 10) / 10;
 }
 
+// ---------- Treino junto ----------
+
+/** Treinos que começaram com até 2 horas de diferença contam como treino juntos. */
+export const JOINT = { windowMs: 2 * 3600000, xp: 30, coins: 10 } as const;
+
+export interface JointPair {
+  a: string; // id do treino do primeiro perfil
+  b: string; // id do treino do segundo perfil
+  /** Quando o segundo dos dois terminou (é aí que o bônus entra). */
+  at: number;
+}
+
+/** Pareia os treinos dos dois (cada treino entra em no máximo um par). */
+export function jointWorkouts(a: Workout[], b: Workout[]): JointPair[] {
+  const done = (ws: Workout[]) =>
+    ws.filter((w) => w.finishedAt).sort((x, y) => x.startedAt.localeCompare(y.startedAt));
+  const bs = done(b);
+  const used = new Set<string>();
+  const out: JointPair[] = [];
+  for (const wa of done(a)) {
+    const ta = new Date(wa.startedAt).getTime();
+    let best: Workout | null = null;
+    let bestGap = Infinity;
+    for (const wb of bs) {
+      if (used.has(wb.id)) continue;
+      const gap = Math.abs(new Date(wb.startedAt).getTime() - ta);
+      if (gap <= JOINT.windowMs && gap < bestGap) {
+        best = wb;
+        bestGap = gap;
+      }
+    }
+    if (best) {
+      used.add(best.id);
+      out.push({
+        a: wa.id,
+        b: best.id,
+        at: Math.max(new Date(wa.finishedAt!).getTime(), new Date(best.finishedAt!).getTime()),
+      });
+    }
+  }
+  return out;
+}
+
 export function computeDuo(a: DuoPlayer, b: DuoPlayer, now: Date = new Date()): DuoState {
   const players = [a, b];
   // Treinos concluídos de cada jogador, agrupados por semana.

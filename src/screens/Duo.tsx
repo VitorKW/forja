@@ -3,7 +3,9 @@ import { fmt } from '../components/ui';
 import CheerButtons from '../components/CheerButtons';
 import { CHEERS } from '../game/extras';
 import { COINS } from '../game/shop';
-import { dayKey } from '../game/rules';
+import { dayKey, weekKey } from '../game/rules';
+import { JOINT } from '../game/duo';
+import { SEASON_TIERS, SEASON_WIN_COINS, tiersReached } from '../game/season';
 import { useGame } from '../useProgress';
 
 const rise = (i: number) => ({
@@ -22,8 +24,15 @@ function when(iso: string) {
 }
 
 export default function Duo() {
-  const { profiles, all, me, partner, duo } = useGame();
-  if (!duo) return null;
+  const { profiles, all, me, partner, duo, joint, season } = useGame();
+  if (!duo || !season) return null;
+  const jointIds = new Set(joint.map((j) => (partner === 0 ? j.a : j.b)));
+  const thisWeek = weekKey(new Date());
+  const jointWeek = joint.filter((j) => weekKey(new Date(j.at)) === thisWeek).length;
+  const sc = season.current;
+  const maxSeason = Math.max(1, ...sc.points);
+  const myPts = sc.points[me];
+  const nextTier = SEASON_TIERS.find((t) => myPts < t.xp);
   const mine = profiles[me];
   const other = profiles[partner];
   const { raid, challenge } = duo;
@@ -82,7 +91,64 @@ export default function Duo() {
         </p>
       </motion.section>
 
-      <motion.section className="card couple" {...rise(1)}>
+      <motion.section className="card season" {...rise(1)}>
+        <div className="row between">
+          <span className="eyebrow">Temporada</span>
+          <span className="muted small">{season.daysLeft} dia{season.daysLeft === 1 ? '' : 's'} para acabar</span>
+        </div>
+        <h2 className="season-name">{sc.season.name}</h2>
+        {[0, 1].map((i) => (
+          <div key={i} className="duel-row">
+            <span className="duel-name">
+              {profiles[i].name}
+            </span>
+            <div className="duel-track">
+              <div className={`duel-fill p${i}`} style={{ width: `${(sc.points[i] / maxSeason) * 100}%` }} />
+            </div>
+            <span className="num duel-val">
+              {fmt(sc.points[i], 0)} <span className="muted small">XP</span>
+            </span>
+          </div>
+        ))}
+        <ol className="tiers" aria-label="Marcos da temporada">
+          {SEASON_TIERS.map((t, k) => (
+            <li key={k} className={k < tiersReached(myPts) ? 'on' : ''}>
+              <span className="tier-dot" />
+              <span className="num small">{fmt(t.xp / 1000, 1)}k</span>
+              <span className="muted small">+{t.coins}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="muted small">
+          {nextTier ? `Faltam ${fmt(nextTier.xp - myPts, 0)} XP para o próximo marco (+${nextTier.coins} moedas).` : 'Você passou por todos os marcos desta temporada.'} Quem fizer mais XP até o fim leva o troféu e +{SEASON_WIN_COINS} moedas.
+        </p>
+        {season.past.length > 0 && (
+          <ul className="trophies">
+            {season.past.slice(0, 4).map((r) => (
+              <li key={r.season.key}>
+                <span aria-hidden>{r.winner === null ? '🤝' : '🏆'}</span>
+                <span className="grow">{r.season.name}</span>
+                <strong>{r.winner === null ? 'Empate' : profiles[r.winner].name}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
+      </motion.section>
+
+      <motion.section className="card joint" {...rise(2)}>
+        <div className="couple-num">
+          <span className="num">{joint.length}</span>
+          <span className="muted small">juntos</span>
+        </div>
+        <div className="grow">
+          <h2>Treino junto</h2>
+          <p className="muted small">
+            {jointWeek > 0 ? `Nesta semana: ${jointWeek}. ` : ''}Comecem o treino com até 2 horas de diferença: +{JOINT.xp} XP e +{JOINT.coins} moedas para cada um.
+          </p>
+        </div>
+      </motion.section>
+
+      <motion.section className="card couple" {...rise(3)}>
         <div className="couple-num">
           <span className="num">{duo.coupleStreak + (duo.coupleWeekDone ? 1 : 0)}</span>
           <span className="muted small">semana{duo.coupleStreak + (duo.coupleWeekDone ? 1 : 0) === 1 ? '' : 's'}</span>
@@ -101,7 +167,7 @@ export default function Duo() {
         </div>
       </motion.section>
 
-      <motion.section className="card" {...rise(2)}>
+      <motion.section className="card" {...rise(4)}>
         <span className="eyebrow">Desafio da semana</span>
         <h2 style={{ marginTop: 4 }}>{challenge.label}</h2>
         {[0, 1].map((i) => (
@@ -121,7 +187,7 @@ export default function Duo() {
         </p>
       </motion.section>
 
-      <motion.section className="card" {...rise(3)}>
+      <motion.section className="card" {...rise(5)}>
         <h2>Treinos de {other.name}</h2>
         {partnerRecent.length === 0 && <p className="muted small">Quando {other.name} treinar, aparece aqui para você incentivar.</p>}
         <ul className="feed">
@@ -129,6 +195,7 @@ export default function Duo() {
             <li key={w.id}>
               <div className="grow">
                 <strong>{when(w.finishedAt!)}</strong>
+                {jointIds.has(w.id) && <span className="joint-badge">Juntos</span>}
                 <div className="muted small">
                   {w.sets.length} registro{w.sets.length === 1 ? '' : 's'}, <span className="xp-inline">+{all[partner].results[w.id]?.xpTotal ?? 0} XP</span>
                 </div>
@@ -140,7 +207,7 @@ export default function Duo() {
       </motion.section>
 
       {received.length > 0 && (
-        <motion.section className="card" {...rise(4)}>
+        <motion.section className="card" {...rise(6)}>
           <h2>Incentivos para você</h2>
           <ul className="feed">
             {received.map((c) => (

@@ -7,6 +7,7 @@ import { heatColor } from '../heat';
 import { useProfile, useStore, type Look } from '../store';
 import { useProgress } from '../useProgress';
 import { Evolution, Shop, Templates } from './ProfileExtras';
+import { monthKey } from '../game/recap';
 import { TIER_NAME } from '../components/Character';
 import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
@@ -88,7 +89,7 @@ function SyncPanel() {
 export default function Profile() {
   const p = useProgress();
   const { id, name, look, workouts, settings } = useProfile();
-  const { updateSettings, openSummary, deleteWorkout, resetCurrent, renameProfile, setLook } = useStore();
+  const { updateSettings, openSummary, deleteWorkout, resetCurrent, renameProfile, setLook, openRecap } = useStore();
   const history = [...workouts].filter((w) => w.finishedAt).reverse();
   const unlocked = Object.keys(p.achievements).length;
   const records = Object.entries(p.records)
@@ -172,6 +173,12 @@ export default function Profile() {
           </>
         )}
       </section>
+
+      <button className="card recap-teaser" onClick={() => openRecap(monthKey(new Date()))}>
+        <span className="eyebrow">Retrospectiva</span>
+        <strong>Seus meses na forja</strong>
+        <span className="muted small">Números, recordes e uma imagem para compartilhar.</span>
+      </button>
 
       <Evolution />
 

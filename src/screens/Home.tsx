@@ -9,6 +9,7 @@ import { useGame } from '../useProgress';
 import CheerButtons from '../components/CheerButtons';
 import { HABITS, HABIT_XP } from '../game/extras';
 import BossSprite from '../components/BossSprite';
+import { monthKey, monthName, shiftMonth } from '../game/recap';
 
 const DAY_LETTERS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
 const DAY_NAMES = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
@@ -50,7 +51,8 @@ function Ring({ value, goal }: { value: number; goal: number }) {
 }
 
 export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => void; onOpenDuo: () => void }) {
-  const { progress: p, profile, profiles, partner, all, coins } = useGame();
+  const { progress: p, profile, profiles, partner, all, coins, habits, me } = useGame();
+  const openRecap = useStore((s) => s.openRecap);
   const { workouts, look } = profile;
   const toggleHabit = useStore((s) => s.toggleHabit);
   const other = profiles[partner];
@@ -66,7 +68,11 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
   const [y, m, d] = p.week.key.split('-').map(Number);
   const trained = new Set(workouts.filter((w) => w.finishedAt).map((w) => dayKey(new Date(w.finishedAt!))));
   const today = dayKey(new Date());
-  const habitsToday = profile.habits?.[today] ?? [];
+  const habitsToday = habits[me][today] ?? [];
+  const manualToday = profile.habits?.[today] ?? [];
+  // Primeira semana do mês: a retrospectiva do mês passado aparece aqui.
+  const lastMonth = shiftMonth(monthKey(new Date()), -1);
+  const showRecap = new Date().getDate() <= 7 && workouts.some((w) => w.finishedAt?.startsWith(lastMonth));
   const days = DAY_LETTERS.map((letter, i) => {
     const key = dayKey(new Date(y, m - 1, d + i));
     return { letter, name: DAY_NAMES[i], done: trained.has(key), today: key === today };
@@ -107,6 +113,14 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
         </div>
       </motion.section>
 
+      {showRecap && (
+        <motion.button className="card recap-teaser" onClick={() => openRecap(lastMonth)} whileTap={{ scale: 0.98 }} {...rise(1)}>
+          <span className="eyebrow">Retrospectiva</span>
+          <strong>Seu {monthName(lastMonth)} na forja</strong>
+          <span className="muted small">Treinos, recordes e o que vocês fizeram juntos. Toque para ver.</span>
+        </motion.button>
+      )}
+
       <motion.section className="card week-card" {...rise(1)}>
         <div className="week-ring">
           <Ring value={p.week.days} goal={p.week.goal} />
@@ -143,11 +157,13 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
         <div className="habit-list">
           {HABITS.map((h) => {
             const on = habitsToday.includes(h.id);
+            const byDiet = on && !manualToday.includes(h.id);
             return (
               <motion.button
                 key={h.id}
                 className={`habit${on ? ' on' : ''}`}
                 aria-pressed={on}
+                disabled={byDiet}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   toggleHabit(today, h.id);
@@ -156,6 +172,7 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
               >
                 <span className="check" aria-hidden />
                 <span>{h.label}</span>
+                {byDiet && <span className="habit-tag">pela dieta</span>}
               </motion.button>
             );
           })}

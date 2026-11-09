@@ -7,13 +7,16 @@ import Summary from './screens/Summary';
 import Bosses from './screens/Bosses';
 import Profile from './screens/Profile';
 import Duo from './screens/Duo';
+import Diet from './screens/Diet';
+import Recap from './screens/Recap';
 import { Icon } from './components/ui';
 
-export type Tab = 'forja' | 'dupla' | 'chefes' | 'perfil';
+export type Tab = 'forja' | 'dupla' | 'dieta' | 'chefes' | 'perfil';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'forja', label: 'Forja' },
   { id: 'dupla', label: 'Dupla' },
+  { id: 'dieta', label: 'Dieta' },
   { id: 'chefes', label: 'Chefes' },
   { id: 'perfil', label: 'Perfil' },
 ];
@@ -72,10 +75,12 @@ export default function App() {
   const { active, id } = useProfile();
   const summaryId = useStore((s) => s.summaryId);
   const startWorkout = useStore((s) => s.startWorkout);
+  const recapMonth = useStore((s) => s.recapMonth);
 
   let content;
   if (active) content = <WorkoutScreen key="treino" />;
   else if (summaryId) content = <Summary key={`resumo-${summaryId}`} workoutId={summaryId} />;
+  else if (recapMonth) content = <Recap month={recapMonth} />;
   else
     content = (
       <div className="app" key="abas">
@@ -93,6 +98,7 @@ export default function App() {
           >
             {tab === 'forja' && <Home onOpenBosses={() => setTab('chefes')} onOpenDuo={() => setTab('dupla')} />}
             {tab === 'dupla' && <Duo />}
+            {tab === 'dieta' && <Diet />}
             {tab === 'chefes' && <Bosses />}
             {tab === 'perfil' && <Profile />}
           </motion.main>
@@ -112,7 +118,7 @@ export default function App() {
           </nav>
           <motion.button className="fab" onClick={startWorkout} whileTap={{ scale: 0.92 }} aria-label="Começar treino">
             <Icon name="forja" />
-            <span>Treinar</span>
+            <span className="fab-label">Treinar</span>
           </motion.button>
         </div>
       </div>
@@ -122,7 +128,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <AnimatePresence mode="wait">
         <motion.div
-          key={active ? 'treino' : summaryId ? 'resumo' : 'abas'}
+          key={active ? 'treino' : summaryId ? 'resumo' : recapMonth ? 'retro' : 'abas'}
           // Só opacidade: transform aqui quebraria o position: fixed da barra de baixo.
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

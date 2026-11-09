@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import type { BodyWeight, SetEntry, Settings, Template, Workout } from './game/types';
 import type { Cheer, CheerKind, HabitId, HabitLog } from './game/extras';
 import type { ItemKind } from './game/shop';
+import { compactDiet, type DietEntry, type DietGoals, type DietLog } from './game/diet';
+import { dayKey } from './game/rules';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -29,6 +31,8 @@ export interface Profile {
   purchases?: string[];
   equipped?: Partial<Record<ItemKind, string>>;
   bodyWeights?: BodyWeight[];
+  dietLog?: DietLog;
+  dietGoals?: DietGoals;
 }
 
 /** Dados de perfil que vêm da nuvem. */
@@ -42,10 +46,12 @@ export interface RemoteMeta {
   purchases?: string[];
   equipped?: Partial<Record<ItemKind, string>>;
   bodyWeights?: BodyWeight[];
+  dietLog?: DietLog;
+  dietGoals?: DietGoals;
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -58,6 +64,8 @@ export function metaOf(p: Profile): RemoteMeta {
     purchases: p.purchases ?? [],
     equipped: p.equipped ?? {},
     bodyWeights: p.bodyWeights ?? [],
+    dietLog: p.dietLog ?? {},
+    ...(p.dietGoals ? { dietGoals: p.dietGoals } : {}),
   };
 }
 
@@ -116,6 +124,13 @@ interface State {
   buyItem: (id: string) => void;
   equip: (kind: ItemKind, id: string | null) => void;
   logWeight: (day: string, kg: number) => void;
+  addFood: (e: Omit<DietEntry, 'id' | 'at'>) => void;
+  removeFood: (day: string, id: string) => void;
+  setDietGoals: (g: DietGoals) => void;
+
+  /** Mês da retrospectiva aberta (AAAA-MM), ou null. */
+  recapMonth: string | null;
+  openRecap: (month: string | null) => void;
 }
 
 const initialProfiles = [newProfile(DEFAULT_NAMES[0], 'a'), newProfile(DEFAULT_NAMES[1], 'b')];
@@ -139,6 +154,8 @@ export const useStore = create<State>()(
         summaryId: null,
         syncCode: null,
         syncStatus: null,
+        recapMonth: null,
+        openRecap: (recapMonth) => set({ recapMonth }),
         setSyncStatus: (syncStatus) => set({ syncStatus }),
 
         switchProfile: (id) => set({ currentId: id, summaryId: null }),
@@ -221,6 +238,21 @@ export const useStore = create<State>()(
             bodyWeights: [...(p.bodyWeights ?? []).filter((b) => b.day !== day), { day, kg }].sort((a, b) => a.day.localeCompare(b.day)),
             metaAt: Date.now(),
           })),
+        addFood: (e) =>
+          update((p) => {
+            const day = dayKey(new Date());
+            const log = { ...(p.dietLog ?? {}) };
+            log[day] = [...(log[day] ?? []), { ...e, id: uid(), at: new Date().toISOString() }];
+            return { dietLog: compactDiet(log, day), metaAt: Date.now() };
+          }),
+        removeFood: (day, id) =>
+          update((p) => {
+            const log = { ...(p.dietLog ?? {}) };
+            log[day] = (log[day] ?? []).filter((x) => x.id !== id);
+            if (!log[day].length) delete log[day];
+            return { dietLog: log, metaAt: Date.now() };
+          }),
+        setDietGoals: (dietGoals) => update(() => ({ dietGoals, metaAt: Date.now() })),
         // Junta os treinos: soma os que faltam aqui e tira os que foram apagados lá.
         mergeRemoteWorkouts: (slot, live, dead) =>
           updateAt(slot, (p) => {
