@@ -128,6 +128,7 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
         unsubs.push(
           onSnapshot(
             ref,
+            { includeMetadataChanges: true },
             (snap) => {
               if (snap.exists()) {
                 const meta = snap.data() as RemoteMeta;
@@ -146,6 +147,9 @@ export function startSync(code: string, onStatus: (s: SyncStatus) => void): () =
         unsubs.push(
           onSnapshot(
             collection(ref, 'treinos'),
+            // Inclui mudanças só de metadados: é assim que se sabe que o servidor respondeu
+            // quando o cache já tinha os mesmos dados (caso comum ao reabrir o app).
+            { includeMetadataChanges: true },
             (snap) => {
               const live: Workout[] = [];
               const dead: string[] = [];
