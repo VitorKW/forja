@@ -20,7 +20,7 @@ export function unlockSound() {
   }
 }
 
-function beep() {
+export function beep() {
   if (!audio) return;
   try {
     const t = audio.currentTime;

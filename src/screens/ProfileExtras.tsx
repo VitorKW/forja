@@ -5,6 +5,7 @@ import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import { dayKey, estimate1RM, weekKey, nextWeek } from '../game/rules';
 import { canBuy, SHOP, type ShopItem } from '../game/shop';
+import { bestSetOf, weightTrend } from '../game/evolution';
 import { useStore } from '../store';
 import { useGame } from '../useProgress';
 
@@ -115,7 +116,11 @@ export function Evolution() {
       });
   }, [profile.workouts, chosen]);
 
-  const weights: Point[] = (profile.bodyWeights ?? []).map((b) => ({ label: shortDate(b.day), value: b.kg }));
+  const sortedWeights = useMemo(() => [...(profile.bodyWeights ?? [])].sort((a, b) => a.day.localeCompare(b.day)), [profile.bodyWeights]);
+  const weights: Point[] = sortedWeights.map((b) => ({ label: shortDate(b.day), value: b.kg }));
+  const trend = useMemo(() => weightTrend(sortedWeights), [sortedWeights]);
+  const best = useMemo(() => (chosen ? bestSetOf(profile.workouts, chosen) : null), [profile.workouts, chosen]);
+  const unit = profile.settings.unit;
   const save = () => {
     const v = Number(kg.replace(',', '.'));
     if (v >= 25 && v <= 300) {
@@ -148,10 +153,25 @@ export function Evolution() {
       ) : (
         <p className="muted small">Registre o mesmo exercício de força em dois treinos para ver a curva.</p>
       )}
+      {best && (
+        <p className="muted small chart-note">
+          Melhor série: {fmt(best.best.weight)} {unit} × {best.best.reps} em {shortDate(best.best.day)} (1RM ≈ {fmt(best.best.oneRM)} {unit}) · carga máxima {fmt(best.heaviest)} {unit}
+        </p>
+      )}
 
       <h3 className="chart-head">Peso corporal</h3>
       {weights.length >= 2 ? (
-        <LineChart data={weights} unit="kg" caption="Peso corporal ao longo do tempo" />
+        <>
+          <LineChart data={weights} unit="kg" caption="Peso corporal ao longo do tempo, com média de 7 dias" trend={trend.avg} trendLabel="média 7 dias" />
+          {trend.now !== null && (
+            <p className="muted small chart-note">
+              Tendência: <strong>{fmt(trend.now)} kg</strong>
+              {trend.delta !== null
+                ? ` (${trend.delta > 0 ? '+' : trend.delta < 0 ? '−' : '±'}${fmt(Math.abs(trend.delta))} kg em ${Math.round(trend.days / 7)} semanas)`
+                : ' · com 4 semanas de registros aparece quanto mudou'}
+            </p>
+          )}
+        </>
       ) : (
         <p className="muted small">{weights.length === 1 ? `Último registro: ${fmt(weights[0].value)} kg.` : 'Registre seu peso de vez em quando para acompanhar.'}</p>
       )}

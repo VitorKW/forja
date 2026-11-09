@@ -9,6 +9,7 @@ import { currentProfile, useProfile, useStore } from '../store';
 import { notifyPartner } from '../push';
 import { LiveJointBoard } from '../components/JointBoard';
 import { BARBELL, BARS, NEEDS_WARMUP, platesFor, warmupFor } from '../game/gym';
+import HoldTimer from '../components/HoldTimer';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -36,7 +37,8 @@ function mmss(sec: number) {
 
 export default function WorkoutScreen() {
   const { active, workouts, settings, templates = [], program } = useProfile();
-  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate, updateSettings } = useStore();
+  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate, updateSettings, setNote } = useStore();
+  const notes = useProfile().notes ?? {};
   const restSeconds = settings.restSeconds ?? 90;
   const [queue, setQueue] = useState<Template | null>(null);
   const now = useNow();
@@ -278,6 +280,15 @@ export default function WorkoutScreen() {
                 {ATTRIBUTE_LABEL[exercise.primary]}
                 {exercise.secondary && ` + ${ATTRIBUTE_LABEL[exercise.secondary]}`}
               </div>
+              <button
+                className="ex-note"
+                onClick={() => {
+                  const v = prompt(`Anotação para ${exercise.name} (ex.: banco na posição 4, pegada fechada):`, notes[exercise.id] ?? '');
+                  if (v !== null) setNote(exercise.id, v);
+                }}
+              >
+                {notes[exercise.id] ? <>📝 {notes[exercise.id]}</> : <span className="muted small">+ Anotação (ajuste do aparelho, pegada…)</span>}
+              </button>
               {superset ? (
                 <div className="superset">
                   <span>
@@ -358,8 +369,9 @@ export default function WorkoutScreen() {
                   )}
                   <div className="steppers">
                     <Stepper label="Carga" value={weight} onChange={setWeight} step={2.5} suffix={settings.unit} />
-                    <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={1} />
+                    {!exercise.timed && <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={1} />}
                   </div>
+                  {exercise.timed && <HoldTimer seconds={reps * 10} onChange={(s) => setReps(Math.max(1, Math.round(s / 10)))} />}
                   {plates && (
                     <div className="plates muted small">
                       <span>
@@ -431,7 +443,7 @@ export default function WorkoutScreen() {
                     </span>
                   ) : (
                     <span>
-                      {fmt(s.weight)} {settings.unit} × {s.reps}
+                      {g.ex.timed ? `${s.weight ? `${fmt(s.weight)} ${settings.unit} · ` : ''}${s.reps * 10} s` : `${fmt(s.weight)} ${settings.unit} × ${s.reps}`}
                       {s.warmup ? <em className="muted"> aquec.</em> : s.rir !== null && <em className="muted"> RIR {s.rir === 4 ? '4+' : s.rir}</em>}
                     </span>
                   )}
@@ -519,7 +531,7 @@ function ExercisePicker({
           </div>
         </div>
       )}
-      <input className="search" placeholder="Buscar exercício..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="search" type="search" aria-label="Buscar exercício" placeholder="Buscar exercício..." value={q} onChange={(e) => setQ(e.target.value)} />
       {[
         { key: 'cardio', label: 'Caminhada, cardio e esportes', items: list.filter((e) => e.kind === 'cardio') },
         ...ATTRIBUTES.map((a) => ({ key: a, label: ATTRIBUTE_LABEL[a], items: list.filter((e) => e.kind === 'forca' && e.primary === a) })),

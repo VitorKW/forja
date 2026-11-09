@@ -1,18 +1,30 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { useProfile, useStore } from './store';
 import Home from './screens/Home';
 import WorkoutScreen from './screens/WorkoutScreen';
 import Summary from './screens/Summary';
-import Bosses from './screens/Bosses';
-import Profile from './screens/Profile';
-import Duo from './screens/Duo';
-import Diet from './screens/Diet';
-import Recap from './screens/Recap';
-import Welcome from './screens/Welcome';
+
+// Telas fora do caminho principal (abrir → treinar) viram arquivos separados: o app
+// abre mais rápido e elas são baixadas logo depois, em segundo plano.
+const loaders = {
+  bosses: () => import('./screens/Bosses'),
+  profile: () => import('./screens/Profile'),
+  duo: () => import('./screens/Duo'),
+  diet: () => import('./screens/Diet'),
+  recap: () => import('./screens/Recap'),
+  welcome: () => import('./screens/Welcome'),
+};
+const Bosses = lazy(loaders.bosses);
+const Profile = lazy(loaders.profile);
+const Duo = lazy(loaders.duo);
+const Diet = lazy(loaders.diet);
+const Recap = lazy(loaders.recap);
+const Welcome = lazy(loaders.welcome);
 import { notifyStart } from './push';
 import { Icon } from './components/ui';
 import { PushStatusReporter } from './components/PushPanel';
+import WhatsNew from './components/WhatsNew';
 
 export type Tab = 'forja' | 'dupla' | 'dieta' | 'chefes' | 'perfil';
 
@@ -75,9 +87,13 @@ function useSync() {
   }, [code, setStatus]);
 }
 
+// ?demo=1&tab=dieta abre direto a demonstração numa aba (usado nos prints do README).
+const params = new URLSearchParams(location.search);
+const urlTab = params.get('tab') as Tab | null;
+
 export default function App() {
   useSync();
-  const [tab, setTab] = useState<Tab>('forja');
+  const [tab, setTab] = useState<Tab>(urlTab && TABS.some((t) => t.id === urlTab) ? urlTab : 'forja');
   const { active, id } = useProfile();
   const summaryId = useStore((s) => s.summaryId);
   const startWorkout = useStore((s) => s.startWorkout);
@@ -86,6 +102,11 @@ export default function App() {
   const demo = useStore((s) => !!s.demo);
   const exitDemo = useStore((s) => s.exitDemo);
   const openDemo = () => import('./demo').then((m) => useStore.getState().enterDemo(m.demoProfiles()));
+  useEffect(() => {
+    // Pré-carrega as outras abas quando o celular estiver livre, para trocar sem atraso.
+    const t = setTimeout(() => Object.values(loaders).forEach((l) => l().catch(() => {})), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   let content;
   if (!onboarded && !demo) content = <Welcome key="boas-vindas" onDemo={openDemo} />;
@@ -115,11 +136,13 @@ export default function App() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
-            {tab === 'forja' && <Home onOpenBosses={() => setTab('chefes')} onOpenDuo={() => setTab('dupla')} />}
-            {tab === 'dupla' && <Duo />}
-            {tab === 'dieta' && <Diet />}
-            {tab === 'chefes' && <Bosses />}
-            {tab === 'perfil' && <Profile />}
+            <Suspense fallback={<p className="muted small" style={{ padding: 16 }}>Carregando…</p>}>
+              {tab === 'forja' && <Home onOpenBosses={() => setTab('chefes')} onOpenDuo={() => setTab('dupla')} />}
+              {tab === 'dupla' && <Duo />}
+              {tab === 'dieta' && <Diet />}
+              {tab === 'chefes' && <Bosses />}
+              {tab === 'perfil' && <Profile />}
+            </Suspense>
           </motion.main>
         </AnimatePresence>
         <div className="dock">
@@ -149,6 +172,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <PushStatusReporter />
+      {onboarded && !demo && !active && params.get('demo') !== '1' && <WhatsNew />}
       <AnimatePresence mode="wait">
         <motion.div
           key={!onboarded && !demo ? 'boas-vindas' : active ? 'treino' : summaryId ? 'resumo' : recapMonth ? 'retro' : 'abas'}
@@ -158,7 +182,7 @@ export default function App() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
         >
-          {content}
+          <Suspense fallback={null}>{content}</Suspense>
         </motion.div>
       </AnimatePresence>
     </MotionConfig>

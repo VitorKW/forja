@@ -215,5 +215,7 @@ export function loadTarget(workouts: Workout[], slot: Slot, deload: boolean): Lo
 /** Texto curto da prescrição: "3 × 6–10 · RIR 2". */
 export function prescription(slot: Slot): string {
   if (slot.role === 'cardio') return `${slot.reps[0] === slot.reps[1] ? slot.reps[0] : `${slot.reps[0]}–${slot.reps[1]}`} min`;
+  // Isometria: reps são blocos de 10 s.
+  if (EXERCISE_BY_ID[slot.exerciseId]?.timed) return `${slot.sets} × ${slot.reps[0] * 10}–${slot.reps[1] * 10} s`;
   return `${slot.sets} × ${slot.reps[0]}–${slot.reps[1]}${slot.rir !== null ? ` · RIR ${slot.rir}` : ''}`;
 }

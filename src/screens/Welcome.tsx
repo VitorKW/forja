@@ -3,12 +3,18 @@ import { motion } from 'motion/react';
 import Character from '../components/Character';
 import { ATTRIBUTES, type Attribute } from '../game/types';
 import { useStore, type Look } from '../store';
+import { markSeen } from '../game/changelog';
 
 const START_LEVELS = Object.fromEntries(ATTRIBUTES.map((a) => [a, 1])) as Record<Attribute, number>;
 
 /** Primeira abertura: nome, visual, nome do par e meta. Ou entrar no modo demonstração. */
 export default function Welcome({ onDemo }: { onDemo: () => void }) {
-  const finish = useStore((s) => s.finishOnboarding);
+  const finishOnboarding = useStore((s) => s.finishOnboarding);
+  // Quem acabou de chegar não precisa ver as novidades.
+  const finish: typeof finishOnboarding = (a) => {
+    markSeen();
+    finishOnboarding(a);
+  };
   const setSyncCode = useStore((s) => s.setSyncCode);
   const [me, setMe] = useState('');
   const [partner, setPartner] = useState('');

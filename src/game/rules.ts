@@ -386,8 +386,8 @@ export function computeProgress(workouts: Workout[], settings: Settings, now: Da
           stats.bestRirRun = Math.max(stats.bestRirRun, rirRun);
         }
 
-        // Recordes pessoais (qualquer exercício de força)
-        if (!s.warmup) {
+        // Recordes pessoais (qualquer exercício de força; isometria não tem 1RM)
+        if (!s.warmup && !ex.timed) {
           const e = estimate1RM(s.weight, s.reps);
           if (e !== null) {
             const r = records[ex.id];

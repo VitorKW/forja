@@ -41,6 +41,8 @@ export interface Profile {
   dietGoalsLog?: GoalChange[];
   /** Refeições salvas. */
   meals?: Meal[];
+  /** Anotação por exercício (ex.: "banco na posição 4"). */
+  notes?: Record<string, string>;
   /** Semanas congeladas na loja (a sequência não quebra). */
   frozenWeeks?: string[];
   /** Apostas propostas por este perfil. */
@@ -112,10 +114,11 @@ export interface RemoteMeta {
   live?: LiveInfo | null;
   meals?: Meal[];
   frozenWeeks?: string[];
+  notes?: Record<string, string>;
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks', 'notes'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -138,6 +141,7 @@ export function metaOf(p: Profile): RemoteMeta {
     ...(p.missions ? { missions: p.missions } : {}),
     ...(p.meals?.length ? { meals: p.meals } : {}),
     ...(p.frozenWeeks?.length ? { frozenWeeks: p.frozenWeeks } : {}),
+    ...(p.notes && Object.keys(p.notes).length ? { notes: p.notes } : {}),
   };
 }
 
@@ -210,6 +214,7 @@ interface State {
   addFood: (e: Omit<DietEntry, 'id' | 'at'>, day?: string) => void;
   removeFood: (day: string, id: string) => void;
   saveMeal: (name: string, items: Meal['items']) => void;
+  setNote: (exerciseId: string, text: string) => void;
   deleteMeal: (id: string) => void;
   addMeal: (id: string, day?: string) => void;
   /** Congela uma semana que ficou abaixo da meta (custa moedas). */
@@ -392,6 +397,14 @@ export const useStore = create<State>()(
           }),
         saveMeal: (name, items) =>
           update((p) => ({ meals: [...(p.meals ?? []), { id: uid(), name, items }].slice(-20), metaAt: Date.now() })),
+        setNote: (exerciseId, text) =>
+          update((p) => {
+            const notes = { ...(p.notes ?? {}) };
+            const clean = text.trim().slice(0, 120);
+            if (clean) notes[exerciseId] = clean;
+            else delete notes[exerciseId];
+            return { notes, metaAt: Date.now() };
+          }),
         deleteMeal: (id) => update((p) => ({ meals: (p.meals ?? []).filter((m) => m.id !== id), metaAt: Date.now() })),
         addMeal: (id, day) => {
           const meal = (currentProfile(get()).meals ?? []).find((m) => m.id === id);

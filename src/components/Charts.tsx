@@ -39,7 +39,7 @@ function useHover(count: number, band = false) {
   return { ref, i, onMove, onLeave: () => setI(null) };
 }
 
-function Table({ data, unit, caption }: { data: Point[]; unit: string; caption: string }) {
+function Table({ data, unit, caption, extraLabel }: { data: (Point & { extra?: number })[]; unit: string; caption: string; extraLabel?: string }) {
   return (
     <table className="sr-only">
       <caption>{caption}</caption>
@@ -50,6 +50,11 @@ function Table({ data, unit, caption }: { data: Point[]; unit: string; caption: 
             <td>
               {fmt(d.value)} {unit}
             </td>
+            {extraLabel && d.extra !== undefined && (
+              <td>
+                {extraLabel} {fmt(d.extra)} {unit}
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
@@ -132,7 +137,11 @@ export function BarChart({ data, unit, caption }: { data: Point[]; unit: string;
   );
 }
 
-export function LineChart({ data, unit, caption }: { data: Point[]; unit: string; caption: string }) {
+/**
+ * `trend` (opcional): uma média por ponto, desenhada como a linha principal; os valores
+ * crus ficam como pontos claros atrás dela.
+ */
+export function LineChart({ data, unit, caption, trend, trendLabel = 'média' }: { data: Point[]; unit: string; caption: string; trend?: number[]; trendLabel?: string }) {
   const values = data.map((d) => d.value);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
@@ -144,15 +153,29 @@ export function LineChart({ data, unit, caption }: { data: Point[]; unit: string
   const yOf = (v: number) => PAD.t + ih - ((v - min) / (max - min || 1)) * ih;
   const d = data.map((p, k) => `${k ? 'L' : 'M'}${xOf(k)},${yOf(p.value)}`).join(' ');
   const last = data.length - 1;
+  const hasTrend = !!trend && trend.length === data.length;
+  // Com tendência, o rótulo e a dica falam da média (é o número que importa).
+  const shown = (k: number) => (hasTrend ? trend![k] : data[k].value);
+  const tip = (k: number) =>
+    hasTrend ? `${data[k].label}: ${fmt(data[k].value)} ${unit} · ${trendLabel} ${fmt(trend![k])}` : `${data[k].label}: ${fmt(data[k].value)} ${unit}`;
 
   return (
     <div className="chart">
       <svg ref={ref} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={caption} onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={onLeave}>
         <Grid max={max} min={min} />
-        <path className="line" d={d} />
+        {hasTrend ? (
+          <>
+            {data.map((p, k) => (
+              <circle key={`raw${k}`} className="dot raw" cx={xOf(k)} cy={yOf(p.value)} r={2.5} />
+            ))}
+            <path className="line" d={trend!.map((v, k) => `${k ? 'L' : 'M'}${xOf(k)},${yOf(v)}`).join(' ')} />
+          </>
+        ) : (
+          <path className="line" d={d} />
+        )}
         {i !== null && <line className="crosshair" x1={xOf(i)} x2={xOf(i)} y1={PAD.t} y2={PAD.t + ih} />}
-        {data.map((p, k) =>
-          k === last || k === i ? <circle key={k} className="dot" cx={xOf(k)} cy={yOf(p.value)} r={4} /> : null,
+        {data.map((_, k) =>
+          k === last || k === i ? <circle key={k} className="dot" cx={xOf(k)} cy={yOf(shown(k))} r={4} /> : null,
         )}
         {[0, last].filter((k, n, arr) => k >= 0 && arr.indexOf(k) === n).map((k) => (
           <text key={k} className="chart-x" x={xOf(k)} y={H - 6} textAnchor={k === 0 && last > 0 ? 'start' : 'end'}>
@@ -160,13 +183,19 @@ export function LineChart({ data, unit, caption }: { data: Point[]; unit: string
           </text>
         ))}
         {last >= 0 && i === null && (
-          <text className="chart-label" x={xOf(last) - 6} y={yOf(data[last].value) - 8} textAnchor="end">
-            {fmt(data[last].value)} {unit}
+          <text className="chart-label" x={xOf(last) - 6} y={yOf(shown(last)) - 8} textAnchor="end">
+            {fmt(shown(last))} {unit}
           </text>
         )}
       </svg>
-      {i !== null && data[i] && <Tip x={xOf(i)} y={yOf(data[i].value)} text={`${data[i].label}: ${fmt(data[i].value)} ${unit}`} />}
-      <Table data={data} unit={unit} caption={caption} />
+      {i !== null && data[i] && <Tip x={xOf(i)} y={yOf(shown(i))} text={tip(i)} />}
+      {hasTrend && (
+        <div className="chart-legend" aria-hidden>
+          <span><i className="key-line" /> {trendLabel}</span>
+          <span><i className="key-dot" /> registros</span>
+        </div>
+      )}
+      <Table data={hasTrend ? data.map((p, k) => ({ label: p.label, value: p.value, extra: trend![k] })) : data} unit={unit} caption={caption} extraLabel={hasTrend ? trendLabel : undefined} />
     </div>
   );
 }

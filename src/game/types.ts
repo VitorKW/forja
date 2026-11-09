@@ -19,6 +19,8 @@ export interface Exercise {
   perMinute?: number;
   /** Cardio: XP extra por km. Ausente = atividade sem distância. */
   perKm?: number;
+  /** Isometria (prancha): reps = blocos de 10 s, registrados com cronômetro. */
+  timed?: boolean;
   /** Velocidade máxima plausível (km/h): distância acima disso não conta. */
   maxKmh?: number;
 }

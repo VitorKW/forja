@@ -2,7 +2,15 @@
 
 **Um app de treino em que cada série vira XP.** Você registra o treino, seu personagem em pixel art ganha nível e equipamento, e os chefes são os seus próprios recordes. Em dupla, o casal enfrenta chefes juntos, aposta, compete por temporada e acompanha o treino do outro ao vivo.
 
-▶️ **Experimente:** https://vitorkw.github.io/forja/. Na primeira tela, toque em *"Só quero ver como é"* para abrir com dez semanas de dados de exemplo.
+▶️ **Experimente:** [vitorkw.github.io/forja/?demo=1](https://vitorkw.github.io/forja/?demo=1) abre direto no modo demonstração, com dez semanas de dados de exemplo (nada é salvo). Sem o `?demo=1`, toque em *"Só quero ver como é"* na primeira tela.
+
+<p align="center">
+  <img src="docs/forja.png" width="19%" alt="Tela inicial: personagem em pixel art nível 10, meta da semana e programa periodizado">
+  <img src="docs/dupla.png" width="19%" alt="Aba Dupla: chefe da semana com a vida e o dano de cada um, temporada">
+  <img src="docs/dieta.png" width="19%" alt="Aba Dieta: proteína, água e calorias do dia, busca na tabela TACO">
+  <img src="docs/chefes.png" width="19%" alt="Aba Chefes: recordes pessoais como chefes">
+  <img src="docs/perfil.png" width="19%" alt="Evolução: XP por semana, 1RM estimado e peso corporal com média de 7 dias">
+</p>
 
 Projeto pessoal de Vitor Wessler (Engenharia de Computação + Educação Física). Uso o app todo dia com minha namorada; ele nasceu de um problema real: a gente parava de treinar quando a motivação acabava.
 

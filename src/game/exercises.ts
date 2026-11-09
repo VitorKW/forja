@@ -32,7 +32,8 @@ export const EXERCISES: Exercise[] = [
   { id: 'panturrilha', name: 'Panturrilha', kind: 'forca', primary: 'pernas' },
   { id: 'hip-thrust', name: 'Hip thrust / elevação pélvica', kind: 'forca', primary: 'pernas' },
   // Core
-  { id: 'prancha', name: 'Prancha (reps = blocos de 10 s)', kind: 'forca', primary: 'core' },
+  { id: 'prancha', name: 'Prancha', kind: 'forca', primary: 'core', timed: true },
+  { id: 'prancha-lateral', name: 'Prancha lateral', kind: 'forca', primary: 'core', timed: true },
   { id: 'abdominal-polia', name: 'Abdominal na polia', kind: 'forca', primary: 'core' },
   { id: 'abdominal', name: 'Abdominal no solo', kind: 'forca', primary: 'core' },
   { id: 'elevacao-pernas', name: 'Elevação de pernas', kind: 'forca', primary: 'core' },
