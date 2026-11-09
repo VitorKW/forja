@@ -119,8 +119,19 @@ export default {
 
     if (path === '/test') {
       const rec = await load(env, key);
-      const sent = await deliver(env, key, rec, { title: 'Forja', body: 'Lembretes ligados! É assim que eles vão aparecer.', tag: 'teste' });
-      return json({ ok: true, sent });
+      if (!rec.subs.length) return json({ ok: true, sent: 0, subs: 0 });
+      // Diagnóstico: devolve a resposta do serviço de push de cada aparelho.
+      try {
+        const vapid = vapidOf(env);
+        const results = await Promise.all(
+          rec.subs.map((s) =>
+            sendPush(s, { title: 'Forja', body: 'Lembretes ligados! É assim que eles vão aparecer.', tag: 'teste' }, vapid).catch((e) => `erro: ${e}`),
+          ),
+        );
+        return json({ ok: true, subs: rec.subs.length, sent: results.filter((r) => typeof r === 'number' && r >= 200 && r < 300).length, results });
+      } catch (e) {
+        return json({ ok: false, sent: 0, subs: rec.subs.length, error: String(e) });
+      }
     }
 
     return json({ error: 'rota' }, 404);

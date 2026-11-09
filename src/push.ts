@@ -79,9 +79,15 @@ export async function disablePush(group: string): Promise<void> {
   }
 }
 
-export async function testPush(group: string, slot: 0 | 1): Promise<number> {
-  const res = await post('/test', { group, slot });
-  return ((await res.json()) as { sent: number }).sent;
+/** Manda um teste. Devolve quantos chegaram ao serviço de push e, se falhou, o motivo. */
+export async function testPush(group: string, slot: 0 | 1): Promise<{ sent: number; subs: number; detail?: string }> {
+  try {
+    const res = await post('/test', { group, slot });
+    const r = (await res.json()) as { sent: number; subs?: number; results?: unknown[]; error?: string };
+    return { sent: r.sent, subs: r.subs ?? 0, detail: r.error ?? (r.sent ? undefined : JSON.stringify(r.results ?? [])) };
+  } catch (e) {
+    return { sent: 0, subs: -1, detail: String(e) };
+  }
 }
 
 /** Avisa o par (não faz nada sem sincronização). Falhas são ignoradas: é só um aviso. */

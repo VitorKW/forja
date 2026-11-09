@@ -39,9 +39,17 @@ export function PushPanel() {
   const test = async () => {
     if (!code || slot === null) return;
     setBusy(true);
-    const sent = await testPush(code, slot).catch(() => -1);
+    const r = await testPush(code, slot);
     setBusy(false);
-    setNote(sent > 0 ? 'Teste enviado. Deve chegar em alguns segundos.' : 'Não encontrei este celular no servidor. Desligue e ligue de novo.');
+    setNote(
+      r.sent > 0
+        ? 'Teste enviado. Deve chegar em alguns segundos.'
+        : r.subs === 0
+          ? 'Não encontrei este celular no servidor. Desligue e ligue de novo.'
+          : r.subs < 0
+            ? `Não consegui falar com o servidor (${r.detail}).`
+            : `O envio falhou: ${r.detail}`,
+    );
   };
 
   return (
