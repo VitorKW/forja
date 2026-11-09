@@ -1,10 +1,19 @@
 import type { LevelInfo } from '../game/rules';
+import { heatAt } from '../heat';
 
-export function XpBar({ info, small }: { info: LevelInfo; small?: boolean }) {
-  const pct = Math.min(100, (info.into / info.need) * 100);
+/** Barra de progresso cujo preenchimento esquenta conforme avança. */
+export function XpBar({ info, small, label }: { info: LevelInfo; small?: boolean; label?: string }) {
+  const t = Math.min(1, info.into / info.need);
   return (
-    <div className={`xpbar${small ? ' small' : ''}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-      <div className="fill" style={{ width: `${pct}%` }} />
+    <div
+      className={`xpbar${small ? ' small' : ''}`}
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={Math.round(t * 100)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div className="fill" style={{ width: `${t * 100}%`, background: `linear-gradient(90deg, #8e1b10, ${heatAt(t)})` }} />
     </div>
   );
 }
@@ -27,7 +36,7 @@ export function Stepper({
   const round = (v: number) => Math.round(v * 100) / 100;
   return (
     <label className="stepper">
-      <span className="stepper-label">{label}</span>
+      <span className="field-label">{label}</span>
       <div className="stepper-row">
         <button type="button" onClick={() => onChange(Math.max(min, round(value - step)))} aria-label={`Diminuir ${label}`}>
           −
@@ -35,6 +44,7 @@ export function Stepper({
         <input
           inputMode="decimal"
           value={value}
+          aria-label={label}
           onChange={(e) => {
             const v = Number(e.target.value.replace(',', '.'));
             if (!Number.isNaN(v)) onChange(Math.max(min, v));
@@ -51,4 +61,28 @@ export function Stepper({
 
 export function fmt(n: number, digits = 1) {
   return n.toLocaleString('pt-BR', { maximumFractionDigits: digits });
+}
+
+/** Ícones desenhados para a navegação (no lugar de emoji). */
+export function Icon({ name }: { name: 'forja' | 'chefes' | 'perfil' }) {
+  const common = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const, 'aria-hidden': true };
+  if (name === 'forja')
+    return (
+      <svg {...common}>
+        <path d="M12 3c2 3 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.2 1.6 1 2.7 2 3.2-.3-3.2.2-5.6 1-7.7z" />
+        <path d="M5 21h14" />
+      </svg>
+    );
+  if (name === 'chefes')
+    return (
+      <svg {...common}>
+        <path d="M4 20 15 9M15 9l2-5 3 3-5 2" />
+        <path d="M7 14l3 3M4 17l3 3" />
+      </svg>
+    );
+  return (
+    <svg {...common}>
+      <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />
+    </svg>
+  );
 }

@@ -13,7 +13,7 @@ const BOSS_NAME: Record<BossId, string> = {
 
 /** Carga mínima para vencer o chefe com N reps (arredondada para cima em 0,5). */
 function weightToBeat(hp: number, reps: number) {
-  return Math.ceil(((hp / (1 + reps / 30)) + 0.01) * 2) / 2;
+  return Math.ceil((hp / (1 + reps / 30) + 0.01) * 2) / 2;
 }
 
 export default function Bosses() {
@@ -23,36 +23,45 @@ export default function Bosses() {
   return (
     <>
       <h1>Chefes</h1>
-      <p className="muted small">
-        Cada chefe tem a vida do seu 1RM estimado + 2,5%. Supere essa marca numa série de até 12 reps para derrotá-lo.
-      </p>
+      <p className="muted lead">Cada chefe é um recorde seu. Para vencer, supere seu 1RM estimado em 2,5% numa série de até 12 repetições.</p>
+
       {BOSS_IDS.map((id) => {
         const b = p.bosses[id];
         const ex = EXERCISE_BY_ID[id];
         if (b.base === null) {
           return (
-            <section key={id} className="card boss sleeping">
-              <h2>💤 {BOSS_NAME[id]}</h2>
-              <p className="muted small">Adormecido. Registre uma série de {ex.name} (até 12 reps) para despertá-lo.</p>
+            <section key={id} className="panel boss sleeping">
+              <h2>{BOSS_NAME[id]}</h2>
+              <p className="muted small">Ainda dormindo. Registre uma série de {ex.name.toLowerCase()} com até 12 repetições para acordá-lo.</p>
             </section>
           );
         }
         const hp = bossHp(b.base);
+        const pct = Math.min(100, ((b.best ?? 0) / hp) * 100);
         return (
-          <section key={id} className="card boss">
-            <div className="row between">
-              <h2>⚔️ {BOSS_NAME[id]}</h2>
-              <span className="badge">{b.defeats}× derrotado</span>
+          <section key={id} className="panel boss">
+            <div className="row between baseline">
+              <h2>{BOSS_NAME[id]}</h2>
+              <span className="muted small">{b.defeats === 0 ? 'invicto' : `vencido ${b.defeats}×`}</span>
             </div>
-            <div className="hp">
-              <div className="hp-fill" style={{ width: `${Math.min(100, ((b.best ?? 0) / hp) * 100)}%` }} />
-              <span>
-                {fmt(b.best ?? 0)} / {fmt(hp)} {unit}
-              </span>
+            <div className="hp" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Seu melhor 1RM comparado à vida do chefe">
+              <div className="hp-fill" style={{ width: `${pct}%` }} />
             </div>
-            <p className="small">
-              Para vencer: <strong>{fmt(weightToBeat(hp, 5))} {unit} × 5</strong> ou <strong>{fmt(weightToBeat(hp, 8))} {unit} × 8</strong>
-            </p>
+            <div className="row between small">
+              <span className="muted">Seu melhor: {fmt(b.best ?? 0)} {unit}</span>
+              <span>Vida: {fmt(hp)} {unit}</span>
+            </div>
+            <div className="beat">
+              <span className="muted small">Para vencer</span>
+              <div className="beat-options">
+                <span className="plate">
+                  <strong>{fmt(weightToBeat(hp, 5))}</strong> {unit} × 5
+                </span>
+                <span className="plate">
+                  <strong>{fmt(weightToBeat(hp, 8))}</strong> {unit} × 8
+                </span>
+              </div>
+            </div>
           </section>
         );
       })}

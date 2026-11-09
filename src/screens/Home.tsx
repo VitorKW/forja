@@ -1,59 +1,85 @@
 import Character from '../components/Character';
 import { XpBar, fmt } from '../components/ui';
-import { levelTitle, RULES } from '../game/rules';
+import { dayKey, levelTitle, RULES } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Attribute } from '../game/types';
+import { heatColor } from '../heat';
 import { useStore } from '../store';
 import { useProgress } from '../useProgress';
 
+const DAY_LETTERS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
+const DAY_NAMES = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
+
 export default function Home() {
   const p = useProgress();
+  const workouts = useStore((s) => s.workouts);
   const startWorkout = useStore((s) => s.startWorkout);
   const levels = Object.fromEntries(ATTRIBUTES.map((a) => [a, p.attrLevels[a].level])) as Record<Attribute, number>;
   const tired = ATTRIBUTES.filter((a) => p.weekSets[a] > RULES.fatigueSetsPerWeek);
   const close = ATTRIBUTES.filter((a) => p.weekSets[a] >= 16 && p.weekSets[a] <= RULES.fatigueSetsPerWeek);
 
+  // Os 7 dias reais da semana atual e se houve treino em cada um.
+  const [y, m, d] = p.week.key.split('-').map(Number);
+  const trained = new Set(workouts.filter((w) => w.finishedAt).map((w) => dayKey(new Date(w.finishedAt!))));
+  const today = dayKey(new Date());
+  const days = DAY_LETTERS.map((letter, i) => {
+    const key = dayKey(new Date(y, m - 1, d + i));
+    return { letter, name: DAY_NAMES[i], done: trained.has(key), today: key === today };
+  });
+  const left = Math.max(0, p.week.goal - p.week.days);
+
   return (
     <>
-      <header className="hero">
+      <header className="forge">
         <Character levels={levels} />
-        <div className="hero-info">
-          <div className="title">{levelTitle(p.level.level)}</div>
-          <div className="level">Nível {p.level.level}</div>
-          <XpBar info={p.level} />
+        <div className="forge-level">
+          <div className="row between baseline">
+            <span className="level-num">Nível {p.level.level}</span>
+            <span className="level-title" style={{ color: heatColor(Math.min(10, p.level.level + 3)) }}>
+              {levelTitle(p.level.level)}
+            </span>
+          </div>
+          <XpBar info={p.level} label="Progresso até o próximo nível" />
           <div className="muted small">
-            {fmt(p.level.into, 0)} / {fmt(p.level.need, 0)} XP
+            {fmt(p.level.into, 0)} de {fmt(p.level.need, 0)} XP para o nível {p.level.level + 1}
           </div>
         </div>
       </header>
 
-      <section className="card">
-        <div className="row between">
-          <h2>Meta da semana</h2>
-          <span className={`badge${p.multiplier > 1 ? ' hot' : ''}`} title="Multiplicador de constância">
-            ×{fmt(p.multiplier, 1)} XP
+      <section className="panel">
+        <div className="row between baseline">
+          <h2>Esta semana</h2>
+          <span className="muted small">
+            meta de {p.week.goal} dias{p.multiplier > 1 && <strong className="mult"> ×{fmt(p.multiplier)} XP</strong>}
           </span>
         </div>
-        <div className="dots">
-          {Array.from({ length: p.week.goal }, (_, i) => (
-            <span key={i} className={`dot${i < p.week.days ? ' on' : ''}`} />
+        <ol className="week" aria-label="Dias treinados nesta semana">
+          {days.map((day, i) => (
+            <li key={i} className={`${day.done ? 'done' : ''}${day.today ? ' today' : ''}`} aria-label={`${day.name}: ${day.done ? 'treinou' : 'sem treino'}`}>
+              <span className="mark" />
+              <span className="letter">{day.letter}</span>
+            </li>
           ))}
-        </div>
+        </ol>
         <p className="muted small">
           {p.week.done
-            ? 'Meta cumprida! Agora é treinar se quiser... ou descansar. Dia de descanso também forja.'
-            : `${p.week.days} de ${p.week.goal} dias. Faltam ${p.week.goal - p.week.days}.`}
+            ? 'Meta cumprida. Treinar de novo rende XP; descansar também faz parte.'
+            : left === 1
+              ? 'Falta 1 dia para cumprir a meta.'
+              : `Faltam ${left} dias para cumprir a meta.`}
+          {p.streak > 0 && ` Constância de ${p.streak} semana${p.streak > 1 ? 's' : ''}.`}
         </p>
-        {p.streak > 0 && <p className="small">🔥 {p.streak} semana(s) de constância</p>}
       </section>
 
       {(tired.length > 0 || close.length > 0) && (
-        <section className="card warn">
+        <section className="panel warn">
           {tired.map((a) => (
-            <p key={a}>⚠️ {ATTRIBUTE_LABEL[a]} sobrecarregado ({p.weekSets[a]} séries nesta semana). O XP dele está pela metade.</p>
+            <p key={a}>
+              {ATTRIBUTE_LABEL[a]} passou de {RULES.fatigueSetsPerWeek} séries nesta semana ({p.weekSets[a]}). Novas séries dele rendem metade do XP.
+            </p>
           ))}
           {close.map((a) => (
             <p key={a}>
-              {ATTRIBUTE_LABEL[a]}: {p.weekSets[a]}/{RULES.fatigueSetsPerWeek} séries na semana.
+              {ATTRIBUTE_LABEL[a]} está com {p.weekSets[a]} de {RULES.fatigueSetsPerWeek} séries na semana.
             </p>
           ))}
         </section>
@@ -63,9 +89,7 @@ export default function Home() {
         Começar treino
       </button>
 
-      {p.workoutsDone === 0 && (
-        <p className="muted small center">Registre sua primeira série para acender a forja. ✨</p>
-      )}
+      {p.workoutsDone === 0 && <p className="muted small center">Seu personagem ainda é aço frio. Cada série esquenta uma parte dele.</p>}
     </>
   );
 }

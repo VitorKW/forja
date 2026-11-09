@@ -1,6 +1,8 @@
+import Seal from '../components/Seal';
 import { XpBar } from '../components/ui';
 import { ACHIEVEMENTS } from '../game/achievements';
 import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
+import { heatColor } from '../heat';
 import { useStore } from '../store';
 import { useProgress } from '../useProgress';
 
@@ -8,56 +10,67 @@ export default function Profile() {
   const p = useProgress();
   const { workouts, settings, updateSettings, openSummary, deleteWorkout, resetAll } = useStore();
   const history = [...workouts].filter((w) => w.finishedAt).reverse();
+  const unlocked = Object.keys(p.achievements).length;
 
   return (
     <>
       <h1>Perfil</h1>
 
-      <section className="card">
+      <section className="panel">
         <h2>Atributos</h2>
-        {ATTRIBUTES.map((a) => (
-          <div key={a} className="attr-row">
-            <span>{ATTRIBUTE_LABEL[a]}</span>
-            <XpBar info={p.attrLevels[a]} small />
-            <span className="num-small">Nv {p.attrLevels[a].level}</span>
-          </div>
-        ))}
+        {ATTRIBUTES.map((a) => {
+          const lvl = p.attrLevels[a].level;
+          return (
+            <div key={a} className="attr-row">
+              <span>{ATTRIBUTE_LABEL[a]}</span>
+              <XpBar info={p.attrLevels[a]} small label={`Progresso de ${ATTRIBUTE_LABEL[a]}`} />
+              <span className="attr-level" style={{ color: lvl > 1 ? heatColor(lvl + 2) : undefined }}>
+                {lvl}
+              </span>
+            </div>
+          );
+        })}
+        <p className="muted small">A cor de cada parte do personagem segue o nível do atributo, como metal esquentando na forja.</p>
       </section>
 
-      <section className="card">
-        <h2>
-          Conquistas{' '}
+      <section className="panel">
+        <div className="row between baseline">
+          <h2>Conquistas</h2>
           <span className="muted small">
-            {Object.keys(p.achievements).length}/{ACHIEVEMENTS.length}
+            {unlocked} de {ACHIEVEMENTS.length}
           </span>
-        </h2>
-        <div className="ach-grid">
+        </div>
+        <ul className="ach-list">
           {ACHIEVEMENTS.map((a) => {
-            const got = p.achievements[a.id];
+            const got = !!p.achievements[a.id];
             return (
-              <div key={a.id} className={`ach${got ? ' got' : ''}`} title={a.description}>
-                <span className="ach-icon">{got ? a.icon : '🔒'}</span>
-                <strong>{a.name}</strong>
-                <span className="muted small">{a.description}</span>
-              </div>
+              <li key={a.id} className={got ? 'got' : ''}>
+                <Seal name={a.name} unlocked={got} />
+                <div>
+                  <strong>{a.name}</strong>
+                  <div className="muted small">{a.description}</div>
+                </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </section>
 
-      <section className="card">
+      <section className="panel">
         <h2>Histórico</h2>
-        {history.length === 0 && <p className="muted small">Nenhum treino ainda.</p>}
+        {history.length === 0 && <p className="muted small">Seus treinos concluídos aparecem aqui.</p>}
         <ul className="history">
           {history.slice(0, 30).map((w) => (
             <li key={w.id}>
-              <button className="link grow left" onClick={() => openSummary(w.id)}>
-                {new Date(w.finishedAt!).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
-                <span className="muted"> · {w.sets.length} séries{w.deload ? ' · deload' : ''}</span>
+              <button className="history-item" onClick={() => openSummary(w.id)}>
+                <span>{new Date(w.finishedAt!).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span>
+                <span className="muted small">
+                  {w.sets.length} séries{w.deload ? ', deload' : ''}
+                </span>
               </button>
-              <span className="num-small">+{p.results[w.id]?.xpTotal ?? 0}</span>
+              <span className="xp-num">+{p.results[w.id]?.xpTotal ?? 0}</span>
               <button
-                className="link danger"
+                className="icon-btn"
                 aria-label="Apagar treino"
                 onClick={() => confirm('Apagar este treino? O XP será recalculado.') && deleteWorkout(w.id)}
               >
@@ -68,7 +81,7 @@ export default function Profile() {
         </ul>
       </section>
 
-      <section className="card">
+      <section className="panel">
         <h2>Configurações</h2>
         <label className="setting">
           Meta semanal
@@ -81,7 +94,7 @@ export default function Profile() {
           </select>
         </label>
         <label className="setting">
-          Unidade
+          Unidade de carga
           <select value={settings.unit} onChange={(e) => updateSettings({ unit: e.target.value as 'kg' | 'lb' })}>
             <option value="kg">kg</option>
             <option value="lb">lb</option>
@@ -89,7 +102,7 @@ export default function Profile() {
         </label>
         <button
           className="ghost danger"
-          onClick={() => confirm('Apagar TODOS os treinos e o progresso? Isso não pode ser desfeito.') && resetAll()}
+          onClick={() => confirm('Apagar todos os treinos e o progresso? Isso não pode ser desfeito.') && resetAll()}
         >
           Apagar todos os dados
         </button>

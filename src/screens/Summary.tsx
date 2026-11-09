@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Seal from '../components/Seal';
+import { fmt } from '../components/ui';
 import { ACHIEVEMENTS } from '../game/achievements';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import { levelTitle } from '../game/rules';
 import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
+import { HEAT } from '../heat';
 import { useStore } from '../store';
 import { useProgress } from '../useProgress';
-import { fmt } from '../components/ui';
 
-function useCountUp(target: number, ms = 900) {
+function useCountUp(target: number, ms = 1100) {
   const [v, setV] = useState(0);
   useEffect(() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return setV(target);
     const start = performance.now();
     let raf = 0;
     const tick = (t: number) => {
@@ -23,6 +26,36 @@ function useCountUp(target: number, ms = 900) {
   return v;
 }
 
+/** O único momento orquestrado do app: faíscas saindo da bigorna quando o treino termina. */
+function Sparks({ count = 28 }: { count?: number }) {
+  const sparks = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => {
+        const angle = -90 + (Math.random() - 0.5) * 140;
+        const dist = 60 + Math.random() * 110;
+        const rad = (angle * Math.PI) / 180;
+        return {
+          i,
+          x: Math.cos(rad) * dist,
+          y: Math.sin(rad) * dist,
+          delay: Math.random() * 0.25,
+          color: HEAT[5 + Math.floor(Math.random() * 5)],
+        };
+      }),
+    [count],
+  );
+  return (
+    <div className="sparks" aria-hidden>
+      {sparks.map((s) => (
+        <span
+          key={s.i}
+          style={{ '--x': `${s.x}px`, '--y': `${s.y}px`, '--d': `${s.delay}s`, background: s.color, color: s.color } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function Summary({ workoutId }: { workoutId: string }) {
   const p = useProgress();
   const close = useStore((s) => s.closeSummary);
@@ -34,85 +67,84 @@ export default function Summary({ workoutId }: { workoutId: string }) {
     return (
       <div className="app">
         <main className="screen">
-          <p>Treino não encontrado.</p>
+          <p>Esse treino não existe mais.</p>
           <button className="primary" onClick={close}>
-            Voltar
+            Voltar à forja
           </button>
         </main>
       </div>
     );
   }
 
-  const maxAttr = Math.max(1, ...ATTRIBUTES.map((a) => r.attrXp[a]));
+  const attrs = ATTRIBUTES.filter((a) => r.attrXp[a] > 0);
+  const maxAttr = Math.max(1, ...attrs.map((a) => r.attrXp[a]));
   const leveled = r.levelAfter > r.levelBefore;
+  const date = new Date(workout.finishedAt!).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div className="app">
       <main className="screen summary">
-        <div className="big-xp">
-          <div className="muted small">XP ganho</div>
-          <div className="num">+{shown}</div>
-          {r.multiplier > 1 && <div className="badge hot">constância ×{fmt(r.multiplier)}</div>}
+        <div className="strike">
+          <Sparks />
+          <div className="strike-num" aria-live="polite">
+            +{shown}
+            <span className="strike-unit">XP</span>
+          </div>
+          <p className="muted small">
+            {workout.sets.length} séries em {date}
+            {r.multiplier > 1 && `, com bônus de constância ×${fmt(r.multiplier)}`}
+          </p>
         </div>
 
         {leveled && (
-          <section className="card levelup">
-            <div className="small">SUBIU DE NÍVEL!</div>
-            <div className="level">Nível {r.levelAfter}</div>
-            <div className="muted">{levelTitle(r.levelAfter)}</div>
+          <section className="panel levelup">
+            <div className="levelup-num">Nível {r.levelAfter}</div>
+            <div className="muted">Você agora é {levelTitle(r.levelAfter).toLowerCase()}.</div>
           </section>
         )}
 
         {r.bossDefeats.map((b) => (
-          <section key={b} className="card boss-win">
-            ⚔️ Chefe derrotado: <strong>{EXERCISE_BY_ID[b].name}</strong>. Ele vai voltar mais forte.
+          <section key={b} className="panel boss-win">
+            Você venceu o chefe do <strong>{EXERCISE_BY_ID[b].name.toLowerCase()}</strong>. Ele volta mais forte na próxima.
           </section>
         ))}
 
         {r.achievements.map((id) => {
           const a = ACHIEVEMENTS.find((x) => x.id === id)!;
           return (
-            <section key={id} className="card achievement-new">
-              <span className="ach-icon">{a.icon}</span>
+            <section key={id} className="panel achievement-new">
+              <Seal name={a.name} unlocked size={52} />
               <div>
-                <div className="small muted">Conquista desbloqueada</div>
                 <strong>{a.name}</strong>
+                <div className="muted small">{a.description}</div>
               </div>
             </section>
           );
         })}
 
-        <section className="card">
-          <h2>Atributos</h2>
-          {ATTRIBUTES.filter((a) => r.attrXp[a] > 0).map((a) => (
+        <section className="panel">
+          <h2>Onde o XP foi parar</h2>
+          {attrs.map((a) => (
             <div key={a} className="attr-row">
               <span>{ATTRIBUTE_LABEL[a]}</span>
               <div className="xpbar small">
-                <div className="fill grow-in" style={{ width: `${(r.attrXp[a] / maxAttr) * 100}%` }} />
+                <div className="fill" style={{ width: `${(r.attrXp[a] / maxAttr) * 100}%` }} />
               </div>
-              <span className="num-small">+{r.attrXp[a]}</span>
+              <span className="xp-num">+{r.attrXp[a]}</span>
+            </div>
+          ))}
+          {r.bonuses.map((b, i) => (
+            <div key={i} className="bonus-row">
+              <span>{b.label}</span>
+              <span className="xp-num">+{b.xp}</span>
             </div>
           ))}
           {r.fatigued.length > 0 && (
             <p className="muted small">
-              ⚠️ Fadiga em {r.fatigued.map((a) => ATTRIBUTE_LABEL[a]).join(', ')}: mais de 20 séries na semana rendem metade do XP.
+              {r.fatigued.map((a) => ATTRIBUTE_LABEL[a]).join(' e ')} passou de 20 séries na semana, então parte do XP veio pela metade.
             </p>
           )}
         </section>
-
-        <section className="card">
-          <h2>Bônus</h2>
-          {r.bonuses.map((b, i) => (
-            <div key={i} className="row between">
-              <span>{b.label}</span>
-              <span className="num-small">+{b.xp}</span>
-            </div>
-          ))}
-        </section>
-
-        <p className="muted small center">
-          {workout.sets.length} séries · {new Date(workout.finishedAt!).toLocaleDateString('pt-BR')}
-        </p>
 
         <button className="primary big" onClick={close}>
           Voltar à forja

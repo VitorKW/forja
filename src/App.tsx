@@ -5,13 +5,14 @@ import WorkoutScreen from './screens/WorkoutScreen';
 import Summary from './screens/Summary';
 import Bosses from './screens/Bosses';
 import Profile from './screens/Profile';
+import { Icon } from './components/ui';
 
 type Tab = 'forja' | 'chefes' | 'perfil';
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'forja', label: 'Forja', icon: '🔥' },
-  { id: 'chefes', label: 'Chefes', icon: '⚔️' },
-  { id: 'perfil', label: 'Perfil', icon: '🛡️' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'forja', label: 'Forja' },
+  { id: 'chefes', label: 'Chefes' },
+  { id: 'perfil', label: 'Perfil' },
 ];
 
 export default function App() {
@@ -31,8 +32,8 @@ export default function App() {
       </main>
       <nav className="tabbar">
         {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-            <span aria-hidden>{t.icon}</span>
+          <button key={t.id} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
+            <Icon name={t.id} />
             {t.label}
           </button>
         ))}

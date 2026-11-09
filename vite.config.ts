@@ -13,6 +13,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      workbox: {
+        // Fontes latinas entram no cache para o app funcionar offline com a tipografia certa.
+        globPatterns: ['**/*.{js,css,html,svg,png}', '**/*-latin-*.woff2'],
+      },
       manifest: {
         name: 'Forja — treino gamificado',
         short_name: 'Forja',

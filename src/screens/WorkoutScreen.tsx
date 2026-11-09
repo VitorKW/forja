@@ -132,7 +132,7 @@ export default function WorkoutScreen() {
           <ExercisePicker onPick={choose} onCancel={exercise ? () => setPicking(false) : undefined} />
         ) : (
           exercise && (
-            <section className="card">
+            <section className="panel">
               <div className="row between">
                 <h2>{exercise.name}</h2>
                 <button className="link" onClick={() => setPicking(true)}>
@@ -142,7 +142,7 @@ export default function WorkoutScreen() {
               <div className="muted small">
                 {ATTRIBUTE_LABEL[exercise.primary]}
                 {exercise.secondary && ` + ${ATTRIBUTE_LABEL[exercise.secondary]}`}
-                {exercise.bossId && ' · ⚔️ chefe'}
+                {exercise.bossId && <span className="tag">chefe</span>}
               </div>
 
               {cardio ? (
@@ -154,7 +154,7 @@ export default function WorkoutScreen() {
                     <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={1} />
                   </div>
                   <div className="field">
-                    <span className="stepper-label">RIR (reps na reserva)</span>
+                    <span className="field-label">RIR (reps na reserva)</span>
                     <div className="chips">
                       {RIR_OPTIONS.map((o) => (
                         <button
@@ -193,7 +193,7 @@ export default function WorkoutScreen() {
         )}
 
         {groups.map((g) => (
-          <section key={g.ex.id} className="card compact">
+          <section key={g.ex.id} className="panel compact">
             <h3>{g.ex.name}</h3>
             <ol className="sets">
               {g.sets.map((s, i) => (
@@ -216,7 +216,7 @@ export default function WorkoutScreen() {
           </section>
         ))}
 
-        <label className="toggle card compact">
+        <label className="toggle panel compact">
           <input type="checkbox" checked={active.deload} onChange={(e) => setDeload(e.target.checked)} />
           <span>
             Treino de deload <span className="muted small">(conta como semana cumprida)</span>
@@ -242,7 +242,7 @@ function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; o
   const list = EXERCISES.filter((e) => norm(e.name).includes(norm(q)));
 
   return (
-    <section className="card">
+    <section className="panel">
       <div className="row between">
         <h2>Escolha o exercício</h2>
         {onCancel && (
@@ -261,7 +261,7 @@ function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; o
             {items.map((e) => (
               <button key={e.id} className="pick" onClick={() => onPick(e)}>
                 {e.name}
-                {e.bossId && <span aria-label="chefe"> ⚔️</span>}
+                {e.bossId && <span className="tag">chefe</span>}
               </button>
             ))}
           </div>
