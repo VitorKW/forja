@@ -34,6 +34,32 @@ function useNow(intervalMs = 1000) {
   return now;
 }
 
+/** Mantém a tela ligada enquanto `on` (o sistema solta a trava ao sair do app; pede de novo ao voltar). */
+function useWakeLock(on: boolean) {
+  useEffect(() => {
+    if (!on || !('wakeLock' in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
+    const acquire = () => {
+      if (document.visibilityState !== 'visible') return;
+      navigator.wakeLock
+        .request('screen')
+        .then((l) => {
+          if (cancelled) void l.release();
+          else lock = l;
+        })
+        .catch(() => undefined);
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', acquire);
+      void lock?.release().catch(() => undefined);
+    };
+  }, [on]);
+}
+
 function mmss(sec: number) {
   const s = Math.max(0, Math.floor(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -58,6 +84,21 @@ export default function WorkoutScreen() {
   const [pickingPair, setPickingPair] = useState(false);
   const timer = useRest(active?.id ?? '');
   const stopRest = useCallback(() => timer.stop(), [timer.stop]); // eslint-disable-line react-hooks/exhaustive-deps
+  useWakeLock(!!settings.keepAwake && !!active && !active.backdate);
+  const pushReady = useMemo(() => restPushReady(), []);
+  // Voltou para o app: some a notificação de descanso que ficou na barra.
+  useEffect(() => {
+    const clear = () => {
+      if (document.visibilityState !== 'visible') return;
+      navigator.serviceWorker
+        ?.getRegistration()
+        .then((reg) => reg?.getNotifications({ tag: 'descanso' }))
+        .then((list) => list?.forEach((n) => n.close()))
+        .catch(() => undefined);
+    };
+    document.addEventListener('visibilitychange', clear);
+    return () => document.removeEventListener('visibilitychange', clear);
+  }, []);
   const [floaters, setFloaters] = useState<{ id: number; text: string }[]>([]);
   const floaterId = useRef(0);
 
@@ -591,8 +632,16 @@ export default function WorkoutScreen() {
             ))}
           </select>
         </div>
+        {'wakeLock' in navigator && (
+          <label className="toggle panel compact">
+            <input type="checkbox" checked={!!settings.keepAwake} onChange={(e) => updateSettings({ keepAwake: e.target.checked })} />
+            <span>
+              Manter a tela ligada durante o treino <span className="muted small">(o cronômetro fica sempre à vista; gasta um pouco mais de bateria)</span>
+            </span>
+          </label>
+        )}
         <p className="muted small center">
-          {restPushReady()
+          {pushReady
             ? 'Com a tela bloqueada, o celular avisa quando o descanso acabar.'
             : 'Para avisar o fim do descanso com a tela bloqueada, ligue as notificações no Perfil.'}
         </p>

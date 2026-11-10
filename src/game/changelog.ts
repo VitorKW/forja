@@ -7,6 +7,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: 16,
+    date: '2026-11-10',
+    items: [
+      'Opção de manter a tela ligada durante o treino (no fim da tela do treino)',
+      'A notificação de descanso some sozinha quando você volta para o app',
+      'Treino lançado para outro dia entra na ordem certa: a "última carga" e as sugestões não se confundem',
+      'Se uma tela der erro, aparece um aviso com botão de recarregar e de baixar seus dados',
+    ],
+  },
+  {
     version: 15,
     date: '2026-11-10',
     items: [

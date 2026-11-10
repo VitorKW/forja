@@ -369,7 +369,9 @@ export const useStore = create<State>()(
           if (p.active.sets.length === 0) return update(() => ({ active: null, live: null, metaAt: Date.now() }));
           const done = finishedVersion(p.active);
           // O "ao vivo" fica com o tempo final, para o par comparar no treino junto.
-          update((q) => ({ workouts: [...q.workouts, done], active: null, live: p.active!.backdate ? null : liveOf(done, q.live?.session), metaAt: Date.now() }));
+          // Ordenado por início: um treino lançado para outro dia entra no lugar certo
+          // (a "última carga" e as sugestões olham a ordem da lista).
+          update((q) => ({ workouts: [...q.workouts, done].sort(byStart), active: null, live: p.active!.backdate ? null : liveOf(done, q.live?.session), metaAt: Date.now() }));
           set({ summaryId: done.id });
         },
         discardWorkout: () => update(() => ({ active: null, live: null, metaAt: Date.now() })),

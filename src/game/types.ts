@@ -61,6 +61,8 @@ export interface Settings {
   restSeconds?: number;
   /** Peso da barra para a conta das anilhas (padrão 20 kg). */
   barKg?: number;
+  /** Manter a tela ligada durante o treino. */
+  keepAwake?: boolean;
 }
 
 /** Ficha de treino: uma lista de exercícios para não ter que escolher um por um. */

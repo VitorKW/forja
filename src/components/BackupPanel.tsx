@@ -50,7 +50,9 @@ export default function BackupPanel() {
   const [note, setNote] = useState<string | null>(null);
 
   const exportAll = async () => {
-    const { profiles, currentId } = useStore.getState();
+    // No modo demonstração, o backup continua sendo dos dados reais.
+    const s = useStore.getState();
+    const { profiles, currentId } = s.demo ?? s;
     const file: BackupFile = { app: 'forja', version: 1, exportedAt: new Date().toISOString(), data: { profiles, currentId } };
     const r = await saveFile(JSON.stringify(file), `forja-backup-${dayKey(new Date())}.json`);
     setNote(r === 'downloaded' ? 'Backup salvo nos downloads.' : 'Backup pronto.');
