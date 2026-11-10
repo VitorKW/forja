@@ -96,7 +96,7 @@ export default function Profile() {
   const profile = useProfile();
   const { id, name, workouts, settings } = profile;
   const { updateSettings, openSummary, deleteWorkout, resetCurrent, renameProfile, openRecap } = useStore();
-  const history = [...workouts].filter((w) => w.finishedAt).reverse();
+  const history = workouts.filter((w) => w.finishedAt).sort((a, b) => b.finishedAt!.localeCompare(a.finishedAt!));
   const unlocked = Object.keys(p.achievements).length;
   const records = Object.entries(p.records)
     .filter(([exId]) => EXERCISE_BY_ID[exId])

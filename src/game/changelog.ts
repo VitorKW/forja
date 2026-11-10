@@ -7,6 +7,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: 14,
+    date: '2026-11-10',
+    items: ['Esqueceu o celular? No treino, toque em "Lançar treino de outro dia" e escolha o dia (até 7 dias atrás)'],
+  },
+  {
     version: 13,
     date: '2026-11-10',
     items: [

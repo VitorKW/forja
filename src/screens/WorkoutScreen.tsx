@@ -12,6 +12,7 @@ import { notifyPartner } from '../push';
 import { LiveJointBoard } from '../components/JointBoard';
 import { BARBELL, BARS, NEEDS_WARMUP, platesFor, warmupFor } from '../game/gym';
 import HoldTimer from '../components/HoldTimer';
+import { backdateDays, backdateLabel, finishedVersion } from '../game/backdate';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -39,7 +40,7 @@ function mmss(sec: number) {
 
 export default function WorkoutScreen() {
   const { active, workouts, settings, templates = [], program } = useProfile();
-  const { addSet, removeSet, setDeload, finishWorkout, discardWorkout, saveTemplate, updateSettings, setNote } = useStore();
+  const { addSet, removeSet, setDeload, setBackdate, finishWorkout, discardWorkout, saveTemplate, updateSettings, setNote } = useStore();
   const { notes = {}, wellness, cycle } = useProfile();
   const restSeconds = settings.restSeconds ?? 90;
   const [queue, setQueue] = useState<Template | null>(null);
@@ -62,7 +63,7 @@ export default function WorkoutScreen() {
   // XP ao vivo: simula o treino atual como se terminasse agora.
   const preview = useMemo(() => {
     if (!active) return 0;
-    const p = computeProgress([...workouts, { ...active, finishedAt: new Date().toISOString() }], settings);
+    const p = computeProgress([...workouts, finishedVersion(active)], settings);
     return p.results[active.id]?.xpTotal ?? 0;
   }, [active, workouts, settings]);
 
@@ -199,6 +200,8 @@ export default function WorkoutScreen() {
       if (exercise.id === superset.a.id) return choose(superset.b);
       if (exercise.id === superset.b.id) choose(superset.a);
     }
+    // Lançando um treino que já passou: sem cronômetro de descanso.
+    if (active.backdate) return;
     const rest = slot && !warmup ? slot.rest : restSeconds;
     timer.start(warmup ? Math.min(60, rest) : rest);
   };
@@ -212,9 +215,10 @@ export default function WorkoutScreen() {
     const s = useStore.getState();
     const name = currentProfile(s).name;
     const series = active.sets.filter((x) => !x.warmup).length;
+    const late = active.backdate ? backdateLabel(active.backdate.day) : null;
     finishWorkout();
     notifyPartner(s.profiles.findIndex((p) => p.id === s.currentId), {
-      title: `${name} terminou o treino 💪`,
+      title: late ? `${name} registrou o treino de ${late} 💪` : `${name} terminou o treino 💪`,
       body: `${series} ${series === 1 ? 'registro' : 'registros'}, +${preview} XP. Manda um incentivo!`,
       tag: 'treino',
     });
@@ -234,8 +238,8 @@ export default function WorkoutScreen() {
     <div className="app">
       <header className="workout-head">
         <div>
-          <div className="muted small">Treino em andamento</div>
-          <div className="timer">{mmss(elapsed)}</div>
+          <div className="muted small">{active.backdate ? 'Lançando treino de' : 'Treino em andamento'}</div>
+          <div className="timer">{active.backdate ? backdateLabel(active.backdate.day) : mmss(elapsed)}</div>
         </div>
         <div className="xp-live" aria-live="polite">
           {preview} XP
@@ -248,7 +252,11 @@ export default function WorkoutScreen() {
       </header>
 
       <main className="screen">
-        <LiveJointBoard active={active} now={now} />
+        {!active.backdate && <LiveJointBoard active={active} now={now} />}
+        <BackdatePicker
+          value={active.backdate ?? null}
+          onChange={setBackdate}
+        />
         {queue && !picking && (
           <div className="queue" aria-label={`Ficha ${queue.name}`}>
             <span className="eyebrow">{queue.name}</span>
@@ -557,6 +565,50 @@ function ExercisePicker({
             ))}
           </div>
         ),
+      )}
+    </section>
+  );
+}
+
+/** Esqueceu o celular? Lança o treino num dia que já passou (até 7 dias). */
+function BackdatePicker({ value, onChange }: { value: { day: string; minutes: number } | null; onChange: (b: { day: string; minutes: number } | null) => void }) {
+  const [open, setOpen] = useState(!!value);
+  const days = useMemo(() => backdateDays(), []);
+  if (!open)
+    return (
+      <button className="link small backdate-open" onClick={() => setOpen(true)}>
+        Esqueceu de registrar? Lançar treino de outro dia
+      </button>
+    );
+  const minutes = value?.minutes ?? 60;
+  return (
+    <section className="panel compact backdate">
+      <div className="row between baseline">
+        <h3>Quando foi este treino?</h3>
+        <button
+          className="link small"
+          onClick={() => {
+            onChange(null);
+            setOpen(false);
+          }}
+        >
+          É de hoje
+        </button>
+      </div>
+      <div className="recent-list">
+        {days.map((d) => (
+          <button key={d.day} type="button" className={`qchip${value?.day === d.day ? ' on' : ''}`} aria-pressed={value?.day === d.day} onClick={() => onChange({ day: d.day, minutes })}>
+            {d.label}
+          </button>
+        ))}
+      </div>
+      {value ? (
+        <>
+          <Stepper label="Duração do treino" value={minutes} onChange={(m) => onChange({ ...value, minutes: Math.max(5, m) })} step={5} min={5} suffix="min" />
+          <p className="muted small">Conta para a meta, a sequência e os chefes daquele dia. O par não vê como "treinando agora".</p>
+        </>
+      ) : (
+        <p className="muted small">Escolha o dia. Dá para lançar treinos de até 7 dias atrás.</p>
       )}
     </section>
   );

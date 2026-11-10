@@ -13,6 +13,7 @@ import type { Redemption, Reward } from './game/rewards';
 import type { CycleConfig, DayCheck, WellnessLog } from './game/wellness';
 import { addMeasures, type Measure, type MeasureId } from './game/evolution';
 import type { Appearance } from './game/appearance';
+import { finishedVersion, type Backdate } from './game/backdate';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -91,6 +92,9 @@ export interface LiveInfo {
 }
 
 /** Resumo ao vivo do treino em andamento. */
+/** Treino lançado para outro dia não aparece como "treinando agora" para o par. */
+const liveFor = (w: Workout, session?: string): LiveInfo | null => (w.backdate ? null : liveOf(w, session));
+
 function liveOf(w: Workout, session?: string): LiveInfo {
   const st = workoutStats(w.sets);
   const s = w.sets.at(-1);
@@ -217,6 +221,7 @@ interface State {
   addSet: (s: Omit<SetEntry, 'id'>) => void;
   removeSet: (id: string) => void;
   setDeload: (deload: boolean) => void;
+  setBackdate: (b: Backdate | null) => void;
   finishWorkout: () => void;
   discardWorkout: () => void;
   closeSummary: () => void;
@@ -342,22 +347,29 @@ export const useStore = create<State>()(
           update((p) => {
             if (!p.active) return {};
             const active = { ...p.active, sets: [...p.active.sets, { ...s, id: uid() }] };
-            return { active, live: liveOf(active, p.live?.session), metaAt: Date.now() };
+            return { active, live: liveFor(active, p.live?.session), metaAt: Date.now() };
           }),
         removeSet: (id) =>
           update((p) => {
             if (!p.active) return {};
             const active = { ...p.active, sets: p.active.sets.filter((s) => s.id !== id) };
-            return { active, live: liveOf(active, p.live?.session), metaAt: Date.now() };
+            return { active, live: liveFor(active, p.live?.session), metaAt: Date.now() };
           }),
         setDeload: (deload) => update((p) => (p.active ? { active: { ...p.active, deload } } : {})),
+        setBackdate: (b) =>
+          update((p) => {
+            if (!p.active) return {};
+            const { backdate: _old, ...rest } = p.active; // eslint-disable-line @typescript-eslint/no-unused-vars
+            const active: Workout = b ? { ...rest, backdate: b } : rest;
+            return { active, live: liveFor(active, p.live?.session), metaAt: Date.now() };
+          }),
         finishWorkout: () => {
           const p = currentProfile(get());
           if (!p.active) return;
           if (p.active.sets.length === 0) return update(() => ({ active: null, live: null, metaAt: Date.now() }));
-          const done = { ...p.active, finishedAt: new Date().toISOString() };
+          const done = finishedVersion(p.active);
           // O "ao vivo" fica com o tempo final, para o par comparar no treino junto.
-          update((q) => ({ workouts: [...q.workouts, done], active: null, live: liveOf(done, q.live?.session), metaAt: Date.now() }));
+          update((q) => ({ workouts: [...q.workouts, done], active: null, live: p.active!.backdate ? null : liveOf(done, q.live?.session), metaAt: Date.now() }));
           set({ summaryId: done.id });
         },
         discardWorkout: () => update(() => ({ active: null, live: null, metaAt: Date.now() })),

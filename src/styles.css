@@ -701,3 +701,7 @@ table.sr-only { display: block; }
 .swatch-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line-hi); padding: 0; }
 .swatch-btn.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold); }
 @media (max-width: 360px) { .appearance { grid-template-columns: 1fr; } .appearance-preview { position: static; margin: 0 auto; } }
+
+/* Treino lançado para outro dia */
+.backdate-open { display: block; margin: 0 auto 4px; }
+.backdate .recent-list { margin: 8px 0 4px; }

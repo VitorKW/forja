@@ -50,6 +50,8 @@ export interface Workout {
   sets: SetEntry[];
   /** Sessão do programa periodizado que este treino cumpre. */
   plan?: { program: string; week: number; session: number };
+  /** Só no treino ativo: lançado depois, para um dia que já passou. */
+  backdate?: { day: string; minutes: number };
 }
 
 export interface Settings {
