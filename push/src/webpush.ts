@@ -89,7 +89,7 @@ export interface Vapid {
 }
 
 /** Envia uma notificação. Devolve o status HTTP (404/410 = inscrição morta). */
-export async function sendPush(sub: PushSubscriptionJSON, data: unknown, vapid: Vapid, ttl = 6 * 3600): Promise<number> {
+export async function sendPush(sub: PushSubscriptionJSON, data: unknown, vapid: Vapid, ttl = 6 * 3600, urgency: 'normal' | 'high' = 'normal'): Promise<number> {
   const body = await encryptPayload(sub, enc.encode(JSON.stringify(data)));
   const res = await fetch(sub.endpoint, {
     method: 'POST',
@@ -98,7 +98,7 @@ export async function sendPush(sub: PushSubscriptionJSON, data: unknown, vapid: 
       'Content-Encoding': 'aes128gcm',
       'Content-Type': 'application/octet-stream',
       TTL: String(ttl),
-      Urgency: 'normal',
+      Urgency: urgency,
     },
     body,
   });

@@ -45,6 +45,7 @@ export function Stepper({
           inputMode="decimal"
           value={value}
           aria-label={label}
+          onFocus={(e) => e.currentTarget.select()}
           onChange={(e) => {
             const v = Number(e.target.value.replace(',', '.'));
             if (!Number.isNaN(v)) onChange(Math.max(min, v));

@@ -1,9 +1,9 @@
 /** Ferramentas de academia: anilhas por lado e séries de aquecimento. */
 
 /** Exercícios feitos com barra olímpica (para a conta das anilhas). */
-export const BARBELL = new Set(['supino', 'supino-inclinado', 'desenvolvimento', 'remada-curvada', 'agachamento', 'terra', 'stiff', 'hip-thrust']);
+export const BARBELL = new Set(['supino', 'supino-inclinado', 'desenvolvimento', 'remada-curvada', 'agachamento', 'terra', 'stiff', 'hip-thrust', 'supino-declinado', 'supino-fechado', 'agachamento-frontal', 'terra-sumo', 'good-morning']);
 /** Multiarticulares pesados que pedem aquecimento progressivo. */
-export const NEEDS_WARMUP = new Set([...BARBELL, 'leg-press', 'supino-halter']);
+export const NEEDS_WARMUP = new Set([...BARBELL, 'leg-press', 'leg-press-45', 'hack', 'supino-halter']);
 
 export const PLATES = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
 export const BARS = [20, 15, 10] as const;

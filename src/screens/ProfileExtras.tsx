@@ -8,6 +8,7 @@ import { canBuy, SHOP, type ShopItem } from '../game/shop';
 import { useBodyUrl } from '../components/body';
 import { bestSetOf, MEASURES, measureSeries, weightTrend, type MeasureId } from '../game/evolution';
 import { useStore } from '../store';
+import { targetText, templateFromDay, trainingDays } from '../game/templates';
 import { useGame } from '../useProgress';
 
 const sprite = (name: string) => `${import.meta.env.BASE_URL}sprites/${name}.png`;
@@ -272,20 +273,66 @@ function Measures() {
 /** Fichas salvas: ver e apagar. */
 export function Templates() {
   const { profile } = useGame();
-  const deleteTemplate = useStore((s) => s.deleteTemplate);
+  const { deleteTemplate, saveTemplate } = useStore();
   const templates = profile.templates ?? [];
+  const days = useMemo(() => trainingDays(profile.workouts), [profile.workouts]);
+  const [day, setDay] = useState('');
+  const chosen = days.some((d) => d.day === day) ? day : days[0]?.day ?? '';
+  const draft = useMemo(() => (chosen ? templateFromDay(profile.workouts, chosen) : null), [profile.workouts, chosen]);
+  const unit = profile.settings.unit;
+
+  const create = () => {
+    if (!draft) return;
+    const name = prompt('Nome da ficha (ex.: Treino A, Pernas):', `Ficha ${templates.length + 1}`);
+    if (name?.trim()) saveTemplate(name.trim().slice(0, 30), draft.exercises, draft.targets);
+  };
+
   return (
     <section className="panel">
       <h2>Fichas de treino</h2>
+      {days.length > 0 && (
+        <div className="day-to-template">
+          <div className="row between baseline">
+            <h3>Transformar um dia em ficha</h3>
+            <select className="mini-select" value={chosen} onChange={(e) => setDay(e.target.value)} aria-label="Dia de treino">
+              {days.map((d) => (
+                <option key={d.day} value={d.day}>
+                  {d.label} · {d.exercises} exerc.
+                </option>
+              ))}
+            </select>
+          </div>
+          {draft && (
+            <>
+              <ol className="template-preview">
+                {draft.exercises.map((id) => (
+                  <li key={id}>
+                    <span>{EXERCISE_BY_ID[id].name}</span>
+                    <span className="muted small num">{targetText(id, draft.targets![id], unit)}</span>
+                  </li>
+                ))}
+              </ol>
+              <button className="primary" onClick={create}>
+                Salvar como ficha
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {templates.length === 0 ? (
-        <p className="muted small">Durante um treino, toque em "Salvar estes exercícios como ficha". Na próxima vez, é só escolher a ficha.</p>
+        <p className="muted small">Junta tudo o que você fez no dia (mesmo em treinos separados) com séries, reps e carga. Na próxima vez, é só escolher a ficha ao treinar.</p>
       ) : (
         <ul className="records">
           {templates.map((t) => (
             <li key={t.id}>
               <div>
                 <strong>{t.name}</strong>
-                <div className="muted small">{t.exercises.map((id) => EXERCISE_BY_ID[id]?.name).filter(Boolean).join(', ')}</div>
+                <div className="muted small">
+                  {t.exercises
+                    .filter((id) => EXERCISE_BY_ID[id])
+                    .map((id) => (t.targets?.[id] ? `${EXERCISE_BY_ID[id].name} ${targetText(id, t.targets[id], unit)}` : EXERCISE_BY_ID[id].name))
+                    .join(' · ')}
+                </div>
               </div>
               <button className="icon-btn" aria-label={`Apagar ficha ${t.name}`} onClick={() => confirm(`Apagar a ficha ${t.name}?`) && deleteTemplate(t.id)}>
                 ×

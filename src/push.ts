@@ -136,3 +136,20 @@ export async function sendStatus(group: string, slot: 0 | 1, status: DayStatus):
     /* ignora */
   }
 }
+
+/** Notificações ligadas neste celular (precisa da sincronização e do aviso ativado no Perfil). */
+export function restPushReady(): boolean {
+  const { syncCode, demo } = useStore.getState();
+  return !!PUSH_URL && !!syncCode && !demo && pushSlot() !== null;
+}
+
+/**
+ * Fim do descanso com o app no fundo ou a tela bloqueada: o servidor manda a notificação na hora.
+ * `at` = horário do fim (ms) para agendar, 0 para cancelar.
+ */
+export function scheduleRestPush(at: number, body?: string) {
+  const slot = pushSlot();
+  const group = useStore.getState().syncCode;
+  if (!restPushReady() || slot === null || !group) return;
+  post('/rest', { group, slot, at, ...(body ? { body } : {}) }).catch(() => undefined);
+}

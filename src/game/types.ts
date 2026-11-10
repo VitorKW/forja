@@ -68,6 +68,14 @@ export interface Template {
   id: string;
   name: string;
   exercises: string[];
+  /** Ficha completa: séries, reps e carga planejadas por exercício (reps = minutos no cardio). */
+  targets?: Record<string, TemplateTarget>;
+}
+
+export interface TemplateTarget {
+  sets: number;
+  reps: number;
+  weight: number;
 }
 
 /** Registro de peso corporal. */

@@ -237,7 +237,7 @@ interface State {
 
   toggleHabit: (day: string, habit: HabitId) => void;
   sendCheer: (toProfileId: string, workoutId: string, kind: CheerKind) => void;
-  saveTemplate: (name: string, exercises: string[]) => void;
+  saveTemplate: (name: string, exercises: string[], targets?: Template['targets']) => void;
   deleteTemplate: (id: string) => void;
   buyItem: (id: string) => void;
   equip: (kind: ItemKind, id: string | null) => void;
@@ -416,8 +416,8 @@ export const useStore = create<State>()(
             ),
           });
         },
-        saveTemplate: (name, exercises) =>
-          update((p) => ({ templates: [...(p.templates ?? []), { id: uid(), name, exercises }], metaAt: Date.now() })),
+        saveTemplate: (name, exercises, targets) =>
+          update((p) => ({ templates: [...(p.templates ?? []), { id: uid(), name, exercises, ...(targets ? { targets } : {}) }], metaAt: Date.now() })),
         deleteTemplate: (id) => update((p) => ({ templates: (p.templates ?? []).filter((t) => t.id !== id), metaAt: Date.now() })),
         buyItem: (id) =>
           update((p) => (p.purchases?.includes(id) ? {} : { purchases: [...(p.purchases ?? []), id], metaAt: Date.now() })),

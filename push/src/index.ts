@@ -14,6 +14,7 @@ import { reminderFor, weeklyFor, type Status, type Weekly } from './reminder';
 
 export interface Env {
   FORJA: KVNamespace;
+  REST: DurableObjectNamespace;
   VAPID_PUBLIC: string;
   VAPID_PRIVATE_JWK: string;
   VAPID_SUBJECT: string;
@@ -65,9 +66,10 @@ async function load(env: Env, key: string): Promise<UserRec> {
 }
 
 /** Manda para todas as inscrições da pessoa e tira as que morreram. */
-async function deliver(env: Env, key: string, rec: UserRec, data: unknown): Promise<number> {
+async function deliver(env: Env, key: string, rec: UserRec, data: unknown, fast = false): Promise<number> {
   const vapid = vapidOf(env);
-  const results = await Promise.all(rec.subs.map((s) => sendPush(s, data, vapid).catch(() => 0)));
+  // Aviso de descanso: urgente e sem valor depois de 1 minuto.
+  const results = await Promise.all(rec.subs.map((s) => (fast ? sendPush(s, data, vapid, 60, 'high') : sendPush(s, data, vapid)).catch(() => 0)));
   const alive = rec.subs.filter((_, i) => results[i] !== 404 && results[i] !== 410);
   if (alive.length !== rec.subs.length) await env.FORJA.put(key, JSON.stringify({ ...rec, subs: alive }));
   return results.filter((r) => r >= 200 && r < 300).length;
@@ -137,6 +139,15 @@ export default {
       return json({ ok: true, sent });
     }
 
+    if (path === '/rest') {
+      // Fim do descanso com o app no fundo: agenda (at > agora) ou cancela (at = 0).
+      const at = Number(body.at) || 0;
+      if (at && (at < Date.now() - 5000 || at > Date.now() + 15 * 60000)) return json({ error: 'horário' }, 400);
+      const stub = env.REST.get(env.REST.idFromName(key));
+      await stub.fetch('https://rest/', { method: 'POST', body: JSON.stringify({ key, at, body: clip(body.body, 120) }) });
+      return json({ ok: true });
+    }
+
     if (path === '/test') {
       const rec = await load(env, key);
       if (!rec.subs.length) return json({ ok: true, sent: 0, subs: 0 });
@@ -171,3 +182,34 @@ export default {
     } while (cursor);
   },
 };
+
+/**
+ * Um alarme por pessoa: quando o descanso acaba, manda a notificação.
+ * Durable Object com alarme (plano grátis, armazenamento SQLite).
+ */
+export class RestAlarm {
+  constructor(
+    private state: DurableObjectState,
+    private env: Env,
+  ) {}
+
+  async fetch(req: Request): Promise<Response> {
+    const { key, at, body } = (await req.json()) as { key: string; at: number; body: string };
+    if (!at) {
+      await this.state.storage.deleteAlarm();
+      await this.state.storage.delete('job');
+    } else {
+      await this.state.storage.put('job', { key, body });
+      await this.state.storage.setAlarm(Math.max(Date.now(), at));
+    }
+    return new Response('ok');
+  }
+
+  async alarm(): Promise<void> {
+    const job = (await this.state.storage.get('job')) as { key: string; body: string } | undefined;
+    if (!job) return;
+    await this.state.storage.delete('job');
+    const rec = await load(this.env, job.key);
+    if (rec.subs.length) await deliver(this.env, job.key, rec, { title: 'Descanso acabou ⏱️', body: job.body || 'Hora da próxima série!', tag: 'descanso' }, true);
+  }
+}

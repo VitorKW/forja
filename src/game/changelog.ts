@@ -7,6 +7,17 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: 15,
+    date: '2026-11-10',
+    items: [
+      'Mais de 110 exercícios (máquinas, halteres, polia, glúteo, core, esportes) e "Usados recentemente" no topo',
+      'Transforme um dia de treino em ficha completa (Perfil › Fichas): séries, reps e carga de cada exercício',
+      'Ao usar a ficha, cada exercício mostra quantas séries faltam e o próximo aparece sozinho',
+      'Cargas recentes com um toque, e tocar no número da carga já deixa pronto para digitar',
+      'Fim do descanso avisa com a tela bloqueada (com as notificações ligadas)',
+    ],
+  },
+  {
     version: 14,
     date: '2026-11-10',
     items: ['Esqueceu o celular? No treino, toque em "Lançar treino de outro dia" e escolha o dia (até 7 dias atrás)'],

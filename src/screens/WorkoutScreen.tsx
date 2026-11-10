@@ -8,11 +8,12 @@ import ExecutionHint from '../components/ExecutionHint';
 import { buildProgram, loadTarget, prescription } from '../game/program';
 import { ATTRIBUTES, ATTRIBUTE_LABEL, type Exercise, type Template } from '../game/types';
 import { currentProfile, useProfile, useStore } from '../store';
-import { notifyPartner } from '../push';
+import { notifyPartner, restPushReady, scheduleRestPush } from '../push';
 import { LiveJointBoard } from '../components/JointBoard';
 import { BARBELL, BARS, NEEDS_WARMUP, platesFor, warmupFor } from '../game/gym';
 import HoldTimer from '../components/HoldTimer';
 import { backdateDays, backdateLabel, finishedVersion } from '../game/backdate';
+import { targetText, templateFromSets } from '../game/templates';
 
 const RIR_OPTIONS: { label: string; value: number | null }[] = [
   { label: '0', value: 0 },
@@ -67,6 +68,39 @@ export default function WorkoutScreen() {
     return p.results[active.id]?.xpTotal ?? 0;
   }, [active, workouts, settings]);
 
+  // Tela bloqueada ou app no fundo durante o descanso: o servidor avisa quando acabar.
+  const restEnd = timer.rest?.end ?? 0;
+  const restLabel = useRef('');
+  restLabel.current = exercise ? `Próxima série: ${exercise.name}` : '';
+  useEffect(() => {
+    if (!restEnd) return;
+    let scheduled = false;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden' && restEnd > Date.now() + 3000) {
+        scheduleRestPush(restEnd, restLabel.current);
+        scheduled = true;
+      } else if (document.visibilityState === 'visible' && scheduled) {
+        scheduleRestPush(0);
+        scheduled = false;
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    onVis();
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      // Pulou ou mudou o descanso antes do fim: cancela. Se já acabou, deixa o aviso chegar.
+      if (scheduled && Date.now() < restEnd - 1500) scheduleRestPush(0);
+    };
+  }, [restEnd]);
+
+  // Os 8 exercícios mais recentes, para achar rápido numa lista grande.
+  const recentIds = useMemo(() => {
+    const out: string[] = [];
+    const done = workouts.filter((w) => w.finishedAt).sort((a, b) => b.finishedAt!.localeCompare(a.finishedAt!));
+    for (const w of done) for (const s of w.sets) if (!out.includes(s.exerciseId) && EXERCISE_BY_ID[s.exerciseId] && out.length < 8) out.push(s.exerciseId);
+    return out;
+  }, [workouts]);
+
   const prevXp = useRef(preview);
   const prevCount = useRef(active?.sets.length ?? 0);
   useEffect(() => {
@@ -107,7 +141,30 @@ export default function WorkoutScreen() {
   const target = slot ? easeOff(loadTarget(workouts, slot, !!planWeek?.deload), top, holdReason) : null;
   const slotDone = (id: string) => active.sets.filter((s) => s.exerciseId === id && !s.warmup).length;
   const suggestion = exercise && !cardio && !slot ? easeOff(suggestLoad(workouts, exercise.id), top, holdReason) : null;
-  const nextSlot = slot && slotDone(slot.exerciseId) >= slot.sets ? planSession?.slots.find((s) => slotDone(s.exerciseId) < s.sets) : undefined;
+  // Ficha completa (fora do programa): a meta de séries de cada exercício.
+  const qTarget = !slot && exercise ? queue?.targets?.[exercise.id] : undefined;
+  const nextSlot =
+    slot && slotDone(slot.exerciseId) >= slot.sets
+      ? planSession?.slots.find((s) => slotDone(s.exerciseId) < s.sets)
+      : qTarget && exercise && slotDone(exercise.id) >= qTarget.sets
+        ? queue!.exercises.filter((id) => EXERCISE_BY_ID[id]).map((id) => ({ exerciseId: id })).find((s) => s.exerciseId !== exercise.id && slotDone(s.exerciseId) < (queue!.targets?.[s.exerciseId]?.sets ?? 1))
+        : undefined;
+  // Cargas já usadas neste exercício: um toque preenche carga e reps.
+  const recentLoads = (() => {
+    if (!exercise || exercise.kind === 'cardio') return [];
+    const seen = new Set<string>();
+    const out: { weight: number; reps: number }[] = [];
+    const all = [...workouts.flatMap((w) => w.sets), ...active.sets];
+    for (let i = all.length - 1; i >= 0 && out.length < 4; i--) {
+      const s = all[i];
+      if (s.exerciseId !== exercise.id || s.warmup) continue;
+      const k = `${s.weight}x${s.reps}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({ weight: s.weight, reps: s.reps });
+    }
+    return out;
+  })();
   const doneIds = new Set(active.sets.map((s) => s.exerciseId));
   // Anilhas (só em kg e exercícios de barra) e aquecimento antes da primeira série de trabalho.
   const bar = settings.barKg ?? 20;
@@ -123,26 +180,27 @@ export default function WorkoutScreen() {
   const startTemplate = (t: Template) => {
     setQueue(t);
     const first = t.exercises.map((id) => EXERCISE_BY_ID[id]).find(Boolean);
-    if (first) choose(first);
+    if (first) choose(first, t);
   };
   const saveAsTemplate = () => {
-    const ids = [...new Set(active.sets.map((s) => s.exerciseId))].filter((id) => EXERCISE_BY_ID[id]);
-    if (!ids.length) return alert('Registre pelo menos um exercício para salvar como ficha.');
+    const draft = templateFromSets(active.sets);
+    if (!draft) return alert('Registre pelo menos uma série de trabalho para salvar como ficha.');
     const name = prompt('Nome da ficha (ex.: Treino A, Pernas):', `Ficha ${templates.length + 1}`);
-    if (name?.trim()) saveTemplate(name.trim().slice(0, 30), ids);
+    if (name?.trim()) saveTemplate(name.trim().slice(0, 30), draft.exercises, draft.targets);
   };
 
-  const choose = (ex: Exercise) => {
+  const choose = (ex: Exercise, tpl: Template | null = queue) => {
     setExercise(ex);
     setPicking(false);
     const all = [...workouts.flatMap((w) => w.sets), ...active.sets];
-    const last = [...all].reverse().find((s) => s.exerciseId === ex.id);
+    const last = [...all].reverse().find((s) => s.exerciseId === ex.id && !s.warmup);
+    const t = tpl?.targets?.[ex.id];
     if (ex.kind === 'cardio') {
-      setReps(last?.reps ?? 30);
+      setReps(last?.reps ?? t?.reps ?? 30);
       setDistance(last?.distance ?? 0);
     } else {
-      setWeight(last?.weight ?? 20);
-      setReps(last?.reps ?? 10);
+      setWeight(last?.weight ?? t?.weight ?? 20);
+      setReps(last?.reps ?? t?.reps ?? 10);
     }
     // No programa, já começa com a carga e as reps do dia.
     const s = planSession?.slots.find((x) => x.exerciseId === ex.id);
@@ -267,6 +325,11 @@ export default function WorkoutScreen() {
                 return (
                   <button key={id} className={`qchip${exercise?.id === id ? ' on' : ''}${doneIds.has(id) ? ' done' : ''}`} onClick={() => choose(ex)}>
                     {ex.name}
+                    {queue.targets?.[id] && ex.kind !== 'cardio' && (
+                      <span className="count">
+                        {slotDone(id)}/{queue.targets[id].sets}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -284,7 +347,7 @@ export default function WorkoutScreen() {
             onTemplate={() => {}}
           />
         ) : picking ? (
-          <ExercisePicker onPick={choose} onCancel={exercise ? () => setPicking(false) : undefined} templates={templates} onTemplate={startTemplate} />
+          <ExercisePicker recent={recentIds} onPick={(e) => choose(e)} onCancel={exercise ? () => setPicking(false) : undefined} templates={templates} onTemplate={startTemplate} />
         ) : (
           exercise && (
             <section className="panel">
@@ -384,6 +447,28 @@ export default function WorkoutScreen() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {qTarget && (
+                    <p className="muted small">
+                      Ficha: <strong className="num">{targetText(exercise.id, qTarget, settings.unit)}</strong> · {Math.min(slotDone(exercise.id), qTarget.sets)}/{qTarget.sets} séries
+                    </p>
+                  )}
+                  {recentLoads.length > 1 && (
+                    <div className="recent-loads" role="group" aria-label="Cargas recentes">
+                      {recentLoads.map((l) => (
+                        <button
+                          key={`${l.weight}x${l.reps}`}
+                          type="button"
+                          className={`qchip${l.weight === weight && l.reps === reps ? ' on' : ''}`}
+                          onClick={() => {
+                            setWeight(l.weight);
+                            setReps(l.reps);
+                          }}
+                        >
+                          <span className="num">{exercise.timed ? `${l.reps * 10} s` : `${fmt(l.weight)} × ${l.reps}`}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                   <div className="steppers">
@@ -506,6 +591,11 @@ export default function WorkoutScreen() {
             ))}
           </select>
         </div>
+        <p className="muted small center">
+          {restPushReady()
+            ? 'Com a tela bloqueada, o celular avisa quando o descanso acabar.'
+            : 'Para avisar o fim do descanso com a tela bloqueada, ligue as notificações no Perfil.'}
+        </p>
       </main>
       <RestTimer rest={timer.rest} now={now} onAdd={(s) => timer.add(s)} onStop={stopRest} />
     </div>
@@ -517,7 +607,9 @@ function ExercisePicker({
   onCancel,
   templates,
   onTemplate,
+  recent = [],
 }: {
+  recent?: string[];
   onPick: (e: Exercise) => void;
   onCancel?: () => void;
   templates: Template[];
@@ -552,6 +644,7 @@ function ExercisePicker({
       )}
       <input className="search" type="search" aria-label="Buscar exercício" placeholder="Buscar exercício..." value={q} onChange={(e) => setQ(e.target.value)} />
       {[
+        ...(q || !recent.length ? [] : [{ key: 'recentes', label: 'Usados recentemente', items: recent.map((id) => EXERCISE_BY_ID[id]).filter(Boolean) }]),
         { key: 'cardio', label: 'Caminhada, cardio e esportes', items: list.filter((e) => e.kind === 'cardio') },
         ...ATTRIBUTES.map((a) => ({ key: a, label: ATTRIBUTE_LABEL[a], items: list.filter((e) => e.kind === 'forca' && e.primary === a) })),
       ].map((g) =>
