@@ -12,6 +12,7 @@ import { workoutStats } from './game/joint';
 import type { Redemption, Reward } from './game/rewards';
 import type { CycleConfig, DayCheck, WellnessLog } from './game/wellness';
 import { addMeasures, type Measure, type MeasureId } from './game/evolution';
+import type { Appearance } from './game/appearance';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -66,6 +67,8 @@ export interface Profile {
   wellness?: WellnessLog;
   /** Medidas corporais. */
   measures?: Measure[];
+  /** Cores do boneco (cabelo, olhos, pele, camiseta). */
+  appearance?: Appearance;
   /** Ciclo menstrual: fica SÓ neste celular (fora de metaOf, nunca vai para a nuvem). */
   cycle?: CycleConfig;
 }
@@ -132,10 +135,11 @@ export interface RemoteMeta {
   redeemed?: Redemption[];
   wellness?: WellnessLog;
   measures?: Measure[];
+  appearance?: Appearance;
 }
 
 /** Campos do perfil que viajam juntos no documento de perfil da nuvem (vence o mais recente). */
-export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks', 'notes', 'rewards', 'redeemed', 'wellness', 'measures'] as const;
+export const META_KEYS = ['name', 'look', 'settings', 'habits', 'templates', 'purchases', 'equipped', 'bodyWeights', 'dietLog', 'dietGoals', 'dietGoalsLog', 'bets', 'betAnswers', 'program', 'missions', 'live', 'meals', 'frozenWeeks', 'notes', 'rewards', 'redeemed', 'wellness', 'measures', 'appearance'] as const;
 
 export function metaOf(p: Profile): RemoteMeta {
   return {
@@ -163,6 +167,7 @@ export function metaOf(p: Profile): RemoteMeta {
     ...(p.redeemed?.length ? { redeemed: p.redeemed } : {}),
     ...(p.wellness && Object.keys(p.wellness).length ? { wellness: p.wellness } : {}),
     ...(p.measures?.length ? { measures: p.measures } : {}),
+    ...(p.appearance && Object.keys(p.appearance).length ? { appearance: p.appearance } : {}),
     // `cycle` fica de fora de propósito: é privado e não sincroniza.
   };
 }
@@ -252,6 +257,7 @@ interface State {
   checkIn: (day: string, patch: DayCheck) => void;
   logMeasures: (day: string, cm: Partial<Record<MeasureId, number>>) => void;
   setCycle: (c: CycleConfig) => void;
+  setAppearance: (id: string, a: Appearance) => void;
   proposeBet: (b: Omit<Bet, 'id' | 'createdAt'>) => Bet;
   cancelBet: (id: string) => void;
   answerBet: (id: string, accepted: boolean) => void;
@@ -457,6 +463,8 @@ export const useStore = create<State>()(
         logMeasures: (day, cm) => update((p) => ({ measures: addMeasures(p.measures ?? [], day, cm), metaAt: Date.now() })),
         // Sem metaAt: o ciclo não sincroniza.
         setCycle: (cycle) => update(() => ({ cycle })),
+        setAppearance: (id, a) =>
+          set({ profiles: get().profiles.map((p) => (p.id === id ? { ...p, appearance: { ...p.appearance, ...a }, metaAt: Date.now() } : p)) }),
         freezeWeek: (week) =>
           update((p) => ((p.frozenWeeks ?? []).includes(week) ? {} : { frozenWeeks: [...(p.frozenWeeks ?? []), week], metaAt: Date.now() })),
         editWorkout: (id, sets) =>

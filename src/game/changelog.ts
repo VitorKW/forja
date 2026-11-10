@@ -7,6 +7,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: 13,
+    date: '2026-11-10',
+    items: [
+      'Personalize o boneco no Perfil: cor do cabelo, dos olhos, tom de pele e camiseta',
+      'O visual aparece igual no celular do par',
+    ],
+  },
+  {
     version: 12,
     date: '2026-11-09',
     items: [

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import Character, { characterLayers } from '../components/Character';
+import { bodyUrl } from '../components/body';
 import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import { computeRecap, monthKey, monthLabel, monthName, shiftMonth, type Recap as RecapData } from '../game/recap';
@@ -68,7 +69,9 @@ export default function Recap({ month }: { month: string }) {
         name: `${month.slice(0, 4)} · ${profile.name}`,
         stats: stats(r),
         highlights: list,
-        layers: characterLayers(levels, p.level.level, profile.look, profile.equipped?.capa).map(sprite),
+        layers: await Promise.all(
+          characterLayers(levels, p.level.level, profile.look, profile.equipped?.capa).map((n) => (n.startsWith('corpo_') ? bodyUrl(profile.look, profile.appearance) : sprite(n))),
+        ),
         pet: profile.equipped?.pet ? sprite(`pet_${profile.equipped.pet}`) : undefined,
       });
       const res = await shareImage(blob, `forja-${month}.png`, `Minha retrospectiva de ${monthLabel(month)}`);
@@ -103,7 +106,7 @@ export default function Recap({ month }: { month: string }) {
               <h1>{title}</h1>
               <p className="muted">{profile.name}</p>
             </div>
-            <Character levels={levels} playerLevel={p.level.level} look={profile.look} capa={profile.equipped?.capa} scale={4.5} />
+            <Character levels={levels} playerLevel={p.level.level} look={profile.look} capa={profile.equipped?.capa} appearance={profile.appearance} scale={4.5} />
           </div>
 
           {r.workouts === 0 && r.xp === 0 ? (

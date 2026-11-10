@@ -5,6 +5,7 @@ import { fmt } from '../components/ui';
 import { EXERCISE_BY_ID } from '../game/exercises';
 import { dayKey, estimate1RM, weekKey, nextWeek } from '../game/rules';
 import { canBuy, SHOP, type ShopItem } from '../game/shop';
+import { useBodyUrl } from '../components/body';
 import { bestSetOf, MEASURES, measureSeries, weightTrend, type MeasureId } from '../game/evolution';
 import { useStore } from '../store';
 import { useGame } from '../useProgress';
@@ -19,6 +20,7 @@ const shortDate = (day: string) => {
 export function Shop() {
   const { profile, coins, duo } = useGame();
   const { buyItem, equip } = useStore();
+  const body = useBodyUrl(profile.look, profile.appearance);
   const purchases = profile.purchases ?? [];
   const equipped = profile.equipped ?? {};
 
@@ -63,7 +65,7 @@ export function Shop() {
               {item.kind === 'capa' ? (
                 <>
                   <img src={sprite(`capa_${item.id}`)} alt="" />
-                  <img src={sprite(`corpo_${profile.look}`)} alt="" />
+                  {body && <img src={body} alt="" />}
                 </>
               ) : (
                 <img className="pet-art" src={sprite(`pet_${item.id}`)} alt="" />

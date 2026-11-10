@@ -1,6 +1,8 @@
 import type { Attribute } from '../game/types';
 import { heatColor } from '../heat';
 import type { Look } from '../store';
+import type { Appearance } from '../game/appearance';
+import { useBodyUrl } from './body';
 
 /**
  * Personagem em pixel art, feito com a skill pxl (fonte em art/personagem.px.js).
@@ -52,6 +54,7 @@ export default function Character({
   scale = 9,
   capa,
   pet,
+  appearance,
 }: {
   levels: Record<Attribute, number>;
   playerLevel: number;
@@ -61,11 +64,14 @@ export default function Character({
   capa?: string;
   /** Bichinho da loja, ao lado do personagem. */
   pet?: string;
+  /** Cores de cabelo, olhos, pele e camiseta. */
+  appearance?: Appearance;
 }) {
   // Mantém o tamanho na tela do desenho antigo (24 unidades de largura), em pixels inteiros.
   const px = Math.max(1, Math.round((24 * scale) / W));
 
   const layers = characterLayers(levels, playerLevel, look, capa);
+  const body = useBodyUrl(look, appearance);
 
   const aura = levels.folego >= 6 || playerLevel >= 8;
   const glow = heatColor(Math.min(10, Math.max(levels.folego, playerLevel)));
@@ -83,9 +89,10 @@ export default function Character({
     >
       <span className="character-shadow" />
       <div className="idle">
-        {layers.map((name) => (
-          <img key={name} src={sprite(name)} alt="" width={W * px} height={H * px} draggable={false} />
-        ))}
+        {layers.map((name) => {
+          const src = name.startsWith('corpo_') ? body : sprite(name);
+          return src ? <img key={name} src={src} alt="" width={W * px} height={H * px} draggable={false} /> : null;
+        })}
       </div>
       {pet && (
         <img

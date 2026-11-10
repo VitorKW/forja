@@ -4,7 +4,7 @@ import { XpBar } from '../components/ui';
 import { ACHIEVEMENTS } from '../game/achievements';
 import { ATTRIBUTES, ATTRIBUTE_LABEL } from '../game/types';
 import { heatColor } from '../heat';
-import { useProfile, useStore, type Look } from '../store';
+import { useProfile, useStore } from '../store';
 import { useProgress } from '../useProgress';
 import { Evolution, Shop, Templates } from './ProfileExtras';
 import { monthKey } from '../game/recap';
@@ -16,6 +16,7 @@ import type { Attribute } from '../game/types';
 import { PushPanel } from '../components/PushPanel';
 import BackupPanel from '../components/BackupPanel';
 import CyclePanel from '../components/CyclePanel';
+import AppearanceEditor from '../components/AppearanceEditor';
 
 const GEAR: Record<Attribute, string> = {
   empurrar: 'Ombreiras',
@@ -92,8 +93,9 @@ function SyncPanel() {
 
 export default function Profile() {
   const p = useProgress();
-  const { id, name, look, workouts, settings } = useProfile();
-  const { updateSettings, openSummary, deleteWorkout, resetCurrent, renameProfile, setLook, openRecap } = useStore();
+  const profile = useProfile();
+  const { id, name, workouts, settings } = profile;
+  const { updateSettings, openSummary, deleteWorkout, resetCurrent, renameProfile, openRecap } = useStore();
   const history = [...workouts].filter((w) => w.finishedAt).reverse();
   const unlocked = Object.keys(p.achievements).length;
   const records = Object.entries(p.records)
@@ -110,16 +112,8 @@ export default function Profile() {
           Nome
           <input className="name-input" value={name} maxLength={20} onChange={(e) => renameProfile(id, e.target.value)} aria-label="Nome do perfil" />
         </label>
-        <div className="setting">
-          Visual
-          <div className="seg">
-            {(['a', 'b'] as Look[]).map((l) => (
-              <button key={l} className={look === l ? 'on' : ''} aria-pressed={look === l} onClick={() => setLook(id, l)}>
-                {l === 'a' ? 'Cabelo curto' : 'Cabelo longo'}
-              </button>
-            ))}
-          </div>
-        </div>
+        <h3 className="chart-head">Visual</h3>
+        <AppearanceEditor profile={profile} />
       </section>
 
       <Shop />

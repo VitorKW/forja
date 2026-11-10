@@ -111,7 +111,7 @@ export default function Home({ onOpenBosses, onOpenDuo }: { onOpenBosses: () => 
           </div>
         </div>
         <div className="stage">
-          <Character levels={levels} playerLevel={p.level.level} look={look} capa={profile.equipped?.capa} pet={profile.equipped?.pet} />
+          <Character levels={levels} playerLevel={p.level.level} look={look} capa={profile.equipped?.capa} pet={profile.equipped?.pet} appearance={profile.appearance} />
         </div>
         <div className="hero-xp">
           <XpBar info={p.level} label="Progresso até o próximo nível" />
